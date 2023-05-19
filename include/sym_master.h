@@ -181,3 +181,6 @@ char check_solution PROTO((sym_environment *env, lp_sol *sol,
 int trim_warm_tree PROTO((sym_environment *env, bc_node *n));
 void free_master PROTO((sym_environment *env));
 #endif
+
+// feb223
+void print_tree PROTO((bc_node *node));

@@ -1270,10 +1270,16 @@ int copy_node(warm_start_desc *ws, bc_node * n_to, bc_node *n_from)
    //FIXME: This is a bit fragile. Assumes variable list doesn't
    //change, etc.
    if (n_from->duals){
+	// Why desc.uind.size (number of variables)?
+	// duals should be of size == m
       n_to->duals = (double *) malloc(ws->rootnode->desc.uind.size*DSIZE);
       memcpy(n_to->duals, n_from->duals,
 	     ws->rootnode->desc.uind.size*DSIZE);
    }
+
+	// feb223
+   	n_to->intcpt = n_from->intcpt;
+	// dj's too?
    
    if (n_from->rays){
       n_to->rays = (double *) malloc(n_from->desc.uind.size*DSIZE);

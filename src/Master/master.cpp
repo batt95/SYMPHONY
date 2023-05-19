@@ -6813,6 +6813,55 @@ SYMPHONYLIB_EXPORT int sym_get_ub_for_new_obj(sym_environment *env, int cnt,
 
 /*===========================================================================*/
 /*===========================================================================*/
+// feb223
+SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
+   int i;
+   bc_node * child;
+
+   if(node){
+      if (node->bc_index == 0){
+         printf("================================\n");
+         printf("Branch and Bound Tree\n");
+         printf("================================\n");
+         // Root node
+         printf ("Id %d level %d, root->node_status is %d and node->feasibility_status is %d.\n", node->bc_index, node->bc_level, node->node_status, node->feasibility_status);
+         if (node->duals){
+            printf("root has duals! %.2f \n", node->duals[0]);
+         }
+         if (node->intcpt){
+            printf("Intercept %.2f \n", node->intcpt);
+         } else {
+            printf("No intercept!\n");
+         }
+         if (!node->children) {
+            printf("Leaf node!\n");
+         }
+         printf("--------------------------\n");
+      } else {
+
+         printf ("Id %d level %d, node->node_status is %d and node->feasibility_status is %d.\n", node->bc_index, node->bc_level, node->node_status, node->feasibility_status);
+         printf("Parent: %d\n", node->parent->bc_index);
+
+         if (node->duals){
+            printf("node has duals! %.2f \n", node->duals[0]);
+            printf("Intercept %.2f \n", node->intcpt);
+         }
+         if (!node->children) {
+            printf("Leaf node!\n");
+         }
+         printf("--------------------------\n");
+      }   
+      // Children
+      for (i = 0; i < node->bobj.child_num; i++){
+         child = node->children[i];
+         // child->intcpt = node->bobj.intcpt[i];
+         print_tree(child);
+      }
+   }
+}
+
+/*===========================================================================*/
+/*===========================================================================*/
 
 SYMPHONYLIB_EXPORT int sym_test(sym_environment *env, int argc, char **argv,
                                 int *test_status)
