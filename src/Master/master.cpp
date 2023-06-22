@@ -6815,9 +6815,18 @@ SYMPHONYLIB_EXPORT int sym_get_ub_for_new_obj(sym_environment *env, int cnt,
 /*===========================================================================*/
 // feb223
 SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
-   int i;
+   int i, n = 6;
    bc_node * child;
-
+   // This might be useful at some point
+   // CoinPackedMatrix *matrix;
+   // const int * columnLength = matrix->getVectorLengths();
+   // const CoinBigIndex * columnStart = matrix->getVectorStarts();
+   // const double * elementByColumn = matrix->getElements();
+   // How to use CoinPackedMatrix
+   // for (k=columnStart[t];k<columnStart[t]+columnLength[t];k++) {
+	//    int iRow=row[k];
+	//    value -= elementByColumn[k]*pi[iRow];
+   // }
    if(node){
       if (node->bc_index == 0){
          printf("================================\n");
@@ -6828,14 +6837,23 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
          if (node->duals){
             printf("root has duals! %.2f \n", node->duals[0]);
          }
-         if (node->intcpt){
-            printf("Intercept %.2f \n", node->intcpt);
-         } else {
-            printf("No intercept!\n");
+         if (node->dj){
+            printf("root has dj\n");
+            for (int j = 0; j < n; j++){
+               printf("%.3f\n", node->dj[j]);
+            }
          }
+         printf("Intercept %.2f \n", node->intcpt);
+
          if (!node->children) {
             printf("Leaf node!\n");
+         } else {
+            for (int j = 0; j < node->bobj.child_num; j++){
+               printf("%d : Branched on X_%d %c %.3f\n",
+                      j, node->bobj.name, node->bobj.sense[j], node->bobj.rhs[j]);
+            }
          }
+
          printf("--------------------------\n");
       } else {
 
@@ -6846,8 +6864,24 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
             printf("node has duals! %.2f \n", node->duals[0]);
             printf("Intercept %.2f \n", node->intcpt);
          }
+         if (node->dj){
+            printf("node has dj\n");
+            for (int j = 0; j < n; j++){
+               printf("%.3f\n", node->dj[j]);
+            }
+         }
+
          if (!node->children) {
             printf("Leaf node!\n");
+            if (node->duals){
+            printf("node has duals! %.2f \n", node->duals[0]);
+            printf("Intercept %.2f \n", node->intcpt);
+         }
+         } else {
+            for (int j = 0; j < node->bobj.child_num; j++){
+               printf("%d : Branched on X_%d %c %.3f\n",
+                      j, node->bobj.name, node->bobj.sense[j], node->bobj.rhs[j]);
+            }
          }
          printf("--------------------------\n");
       }   
@@ -6858,6 +6892,12 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
          print_tree(child);
       }
    }
+}
+
+SYMPHONYLIB_EXPORT int sym_build_dual_func(sym_environment *env) {
+   env->warm_start->n = env->mip->n;
+   env->warm_start->m = env->mip->m;
+   return build_dual_func(env->warm_start);
 }
 
 /*===========================================================================*/

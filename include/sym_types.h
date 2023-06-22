@@ -30,6 +30,9 @@
 #include "sym_proto.h"
 #include "sym_constants.h" 
 
+// feb223
+#include "CoinPackedMatrix.hpp"
+
 typedef struct LP_SOL{
    int            lp;          /* the tid of the lp process asssociated with
 				  the current solution */
@@ -163,7 +166,8 @@ typedef struct DOUBLE_ARRAY_DESC{
 typedef struct BASIS_DESC{
    char                basis_exists;
    
-   /*========================================================================*\    * Notes:
+   /*========================================================================*\    
+    * Notes:
     *  1) for base...:
     *     if list is non-NULL then it refers to col/row inds, not userinds
     *	    or cut names.
@@ -902,6 +906,13 @@ typedef struct MIPDESC{
  * The warm start description contains all information needed to warm start
  * the algorithm.
 \*===========================================================================*/
+// feb223
+typedef struct DUAL_FUNC_DESC{
+   // dual pieces and reduced costs
+   CoinPackedMatrix  *duals;
+   CoinPackedMatrix  *djs;
+   int               policy;      
+}dual_func_desc;
 
 typedef struct WARM_START_DESC{
    bc_node       *rootnode;
@@ -918,6 +929,19 @@ typedef struct WARM_START_DESC{
    char           trim_tree;
    int            trim_tree_level;
    int            trim_tree_index;
+   // feb223
+#ifdef SENSITIVITY_ANALYSIS 
+   // disjunction
+   branch_desc    **bpaths;
+   int            num_paths;   // num of disjunction terms
+   int            *leaf_depth; // size of each disjunction term
+   int            num_pieces; // total number of terms
+   // There is probably a better place to store these informations
+   int            m;  // Num of constraint in the original MIPdesc
+   int            n;  // Num of variables in the original MIPdesc
+   dual_func_desc *dual_func;
+#endif
+
 }warm_start_desc;
 
 /*===========================================================================*/

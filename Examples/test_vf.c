@@ -75,7 +75,7 @@ int main(int argc, char **argv)
    int n = 6;
    int m = 1;
 
-   double *rhs = (double *) malloc(numRhs * sizeof(double));
+   double rhs[numRhs] = {11.5, 4, 10};
    double *coeff = (double *) malloc(n * sizeof(double));
    double *warmCoeff = (double *) malloc(n * sizeof(double));
    double *coldCoeff = (double *) malloc(n * sizeof(double));
@@ -85,26 +85,23 @@ int main(int argc, char **argv)
    double *warmSol = (double *) malloc(n * sizeof(double));
    double *duals = (double *) malloc(m * sizeof(double));
 
-   rhs[0] = 11.5;
-   rhs[1] = 4;
-   rhs[2] = 10;
 
    int* rhs_ind = (int *) malloc(m * sizeof(int));
    double *lb_rhs = (double *) malloc(sizeof(double));
+
+   printf("%d\n", sizeof(warm_start_desc));
    
    sym_environment *env_warm = sym_open_environment(); 
-   sym_environment *env_cold = sym_open_environment(); 
 
    // Maybe we need to store the warm_start_desc
    warm_start_desc * ws; 
 
    sym_parse_command_line(env_warm, argc, argv); 
-   sym_parse_command_line(env_cold, argc, argv);   
+
    sym_load_problem(env_warm);
-   sym_load_problem(env_cold);
 
    sym_set_int_param(env_warm, "verbosity", -2);
-   sym_set_int_param(env_cold, "verbosity", -2);
+
    // feb223
    // Those are the parameters to be set in order to 
    // keep the branch-and-bound tree valid for RHS changes
@@ -125,14 +122,14 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "generate_cgl_cuts", FALSE);
    sym_set_int_param(env_warm, "max_active_nodes", 1);
 
-   // First solve both 
+   // First solve 
    if ((termcode = sym_solve(env_warm)) < 0){
       printf("WARM: PROBLEM INFEASIBLE!\n");
    }
-   
-   print_tree(env_warm->warm_start->rootnode);
-   ws = sym_get_warm_start(env_warm, TRUE);
+   dual_func_desc *df;
 
+   sym_build_dual_func(env_warm);
+   
    sym_get_obj_val(env_warm, warmObjVal);
    printf("WARM OBJ : %.5f\n", *warmObjVal);
 
@@ -140,10 +137,7 @@ int main(int argc, char **argv)
    for (int j = 0; j < n; j++){
       printf("X%d : %.5f\n", j, warmSol[j]);
    }
-
-   print_tree(ws->rootnode);
-   
-   // sym_write_lp(env_warm, "LP");
+   df = env_warm->warm_start->dual_func;
 
    // -----------------------------------------------------
    // RHS Test 
@@ -151,6 +145,7 @@ int main(int argc, char **argv)
    for(int i = 0; i < numRhs; i++){
       printf("=================================\n");
       // Set the new RHS
+      printf("RHS %f\n", rhs[i]);
       sym_set_row_upper(env_warm, 0, rhs[i]);
       sym_set_row_lower(env_warm, 0, rhs[i]);
 
@@ -158,8 +153,8 @@ int main(int argc, char **argv)
       if ((termcode = sym_warm_solve(env_warm)) < 0){
          printf("PROBLEM INFEASIBLE!\n");
       } 
-
-      ws = sym_get_warm_start(env_warm, TRUE);
+      env_warm->warm_start->dual_func = df;
+      sym_build_dual_func(env_warm);
       sym_get_obj_val(env_warm, warmObjVal);
       printf("WARM OBJ : %.5f\n", *warmObjVal);
 
@@ -167,13 +162,11 @@ int main(int argc, char **argv)
       for (int j = 0; j < n; j++){
          printf("X%d : %.5f\n", j, warmSol[j]);
       }
-      print_tree(ws->rootnode);
+      // print_tree(ws->rootnode);
    
    }
    printf("ENDING\n");
 
    sym_close_environment(env_warm);
-   sym_close_environment(env_cold);
-
    return 0;
 }  

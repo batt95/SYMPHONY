@@ -184,3 +184,6 @@ void free_master PROTO((sym_environment *env));
 
 // feb223
 void print_tree PROTO((bc_node *node));
+int sym_build_dual_func PROTO((sym_environment * env));
+
+int build_dual_func PROTO((warm_start_desc * ws));
