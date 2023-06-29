@@ -3887,12 +3887,14 @@ int build_dual_func(warm_start_desc *ws)
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
 
+	int is_new_df = 0;
 	int num_piece = 0;
 	int nnz_duals = 0;
 	int nnz_djs = 0;
 
 	if (!ws->dual_func)
 	{
+		is_new_df = 1;
 		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
 		ws->dual_func->policy = DUALS_SAVE_ALL;
 	}
@@ -3951,7 +3953,7 @@ int build_dual_func(warm_start_desc *ws)
 								 duals_index_col, duals_val, nnz_duals);
 	djs = new CoinPackedMatrix(false, djs_index_row,
 							   djs_index_col, djs_val, nnz_djs);
-	if (!ws->dual_func->duals)
+	if (is_new_df)
 	{
 		// New Dual Function
 		ws->dual_func->duals = duals;
