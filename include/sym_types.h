@@ -31,7 +31,7 @@
 #include "sym_constants.h" 
 
 // feb223
-#include "CoinPackedMatrix.hpp"
+#include "uthash/uthash.h"
 
 typedef struct LP_SOL{
    int            lp;          /* the tid of the lp process asssociated with
@@ -907,39 +907,62 @@ typedef struct MIPDESC{
  * the algorithm.
 \*===========================================================================*/
 // feb223
+typedef struct DJS_DESC {
+    int         *idx;       // nnz idx djs
+    double      *val;       // nnz val djs
+    int         nnz;        // length of idx and val pointers
+} djs_desc;
+
+// uthash.h hashtable is used to keep unique dual solutions
+typedef struct DUAL_SOLUTION {
+    uint64_t    hash;       // field to make this struct hashable
+    int         *idx;       // nnz idx dual multipliers
+    double      *val;       // nnz val dual multipliers
+    int         nnz;        // length of idx and val pointers
+    djs_desc   *djs;        // reduced costs
+    UT_hash_handle hh;      // hashmap handler
+} dual_solution;
+
 typedef struct DUAL_FUNC_DESC{
    // dual pieces and reduced costs
-   CoinPackedMatrix  *duals;
-   CoinPackedMatrix  *djs;
-   int               policy;      
+   dual_solution  *duals;
+   int             num_pieces;
+   int             policy;      
 }dual_func_desc;
 
+typedef struct DISJUNCTION_DESC{
+   int            *lbvaridx;     
+   double         *lb;
+   int             lblen;
+   int            *ubvaridx;
+   double         *ub;
+   int             ublen;
+} disjunction_desc;
+
 typedef struct WARM_START_DESC{
-   bc_node       *rootnode;
-   int            cut_num;
-   int            allocated_cut_num;
-   cut_data     **cuts;
-   problem_stat   stat;
-   node_times     comp_times;
-   int            phase;
-   double         lb;
-   int            has_ub;
-   double         ub;
-   lp_sol         best_sol;
-   char           trim_tree;
-   int            trim_tree_level;
-   int            trim_tree_index;
+   bc_node           *rootnode;
+   int                cut_num;
+   int                allocated_cut_num;
+   cut_data         **cuts;
+   problem_stat       stat;
+   node_times         comp_times;
+   int                phase;
+   double             lb;
+   int                has_ub;
+   double             ub;
+   lp_sol             best_sol;
+   char               trim_tree;
+   int                trim_tree_level;
+   int                trim_tree_index;
    // feb223
 #ifdef SENSITIVITY_ANALYSIS 
-   // disjunction
-   branch_desc    **bpaths;
-   int            num_paths;   // num of disjunction terms
-   int            *leaf_depth; // size of each disjunction term
-   int            num_pieces; // total number of terms
    // There is probably a better place to store these informations
-   int            m;  // Num of constraint in the original MIPdesc
-   int            n;  // Num of variables in the original MIPdesc
-   dual_func_desc *dual_func;
+   int                 m;             // Num of constraint in the original MIPdesc
+   int                 n;             // Num of variables in the original MIPdesc
+   dual_func_desc     *dual_func;
+   disjunction_desc   *disj;          // Disjunction of the tree
+   int                 num_terms;     // num of disjunction terms
+   int                 num_pieces;    // number of duals
 #endif
 
 }warm_start_desc;

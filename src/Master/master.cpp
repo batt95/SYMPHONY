@@ -6897,7 +6897,12 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
 SYMPHONYLIB_EXPORT int sym_build_dual_func(sym_environment *env) {
    env->warm_start->n = env->mip->n;
    env->warm_start->m = env->mip->m;
-   return build_dual_func(env->warm_start);
+   return build_dual_func(env->warm_start, env->mip);
+}
+
+SYMPHONYLIB_EXPORT int sym_print_dual_func(warm_start_desc *ws) {
+   print_dual_function(ws);
+   return 1;
 }
 
 /*===========================================================================*/

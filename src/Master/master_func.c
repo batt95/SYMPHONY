@@ -3717,59 +3717,55 @@ int get_num_leaf_nodes(bc_node *node)
 
 /*===========================================================================*/
 
-void print_duals(warm_start_desc *ws, bc_node *node,
-				 branch_desc *bpath, branch_desc **bpaths,
-				 int *leaf_depth, int *num_paths, int *num_piece,
-				 int *duals_index_row, int *duals_index_col, double *duals_val, int *nnz_duals,
-				 int *djs_index_row, int *djs_index_col, double *djs_val, int *nnz_djs)
+void printDualSolution(dual_solution sol){
+    printf("--------------------\n");
+	printf("dual: ");
+    for(int i = 0; i < sol.nnz; i++){
+        printf("%d : %.2f, ", sol.idx[i], sol.val[i]);
+    }
+
+	printf("\ndjs: ");
+	for(int i = 0; i < sol.djs->nnz; i++){
+        printf("%d : %.2f, ", sol.djs->idx[i], sol.djs->val[i]);
+    }
+    printf("\n");
+}
+
+void printDisjunction(disjunction_desc disj){
+	printf("LBs: ");
+    for(int i = 0; i < disj.lblen; i++){
+        printf("%d : %.2f, ", disj.lbvaridx[i], disj.lb[i]);
+    }
+    printf("\n");
+	printf("UBs: ");
+    for(int i = 0; i < disj.ublen; i++){
+        printf("%d : %.2f, ", disj.ubvaridx[i], disj.ub[i]);
+    }
+	printf("\n");
+	printf("--------------------\n");
+}
+
+void print_dual_function(warm_start_desc *ws)
 {
 	int j = 0;
 	int k = 0;
+	int tot_duals = 0;
 	printf("==========================\n");
 	printf("DUAL FUNCTION\n");
 	printf("==========================\n");
-	for (int i = 0; i < *num_piece; i++)
-	{
-		printf("dual %d: ", i);
-		int found = 0;
-		for (j = 0; j < *nnz_duals; j++)
-		{
-			if (duals_index_row[j] != i)
-			{
-				if (found)
-					break;
-				continue;
-			}
-			found = 1;
-			printf("%.3f ", duals_val[j]);
-		}
-		printf("dj: ");
-		int found_1 = 0;
-		for (k = 0; k < *nnz_djs; k++)
-		{
-			if (djs_index_row[k] != i)
-			{
-				if (found_1)
-					break;
-				continue;
-			}
-			found_1 = 1;
-			printf("[%d] %.3f ", djs_index_col[k], djs_val[k]);
-		}
-		printf("\n");
-	}
+
+    for (dual_solution *s = ws->dual_func->duals; s != NULL; s = (dual_solution *)(s->hh.next)) {
+        tot_duals++;
+        printDualSolution(*s);
+    }
+	assert(tot_duals == ws->dual_func->num_pieces);
+	
 	printf("==========================\n");
 	printf("DISJUNCTION\n");
 	printf("==========================\n");
-	for (int i = 0; i < *num_paths; i++)
+	for (int i = 0; i < ws->num_terms; i++)
 	{
-		branch_desc *disj = bpaths[i];
-		printf("Disj. term %d: ", i);
-		for (j = 0; j < leaf_depth[i]; j++)
-		{
-			printf("[%d] %c %.3f ", disj[j].name, disj[j].sense, disj[j].rhs);
-		}
-		printf("\n");
+		printDisjunction(ws->disj[i]);
 	}
 }
 
@@ -3779,12 +3775,73 @@ void print_duals(warm_start_desc *ws, bc_node *node,
 #define DUALS_SAVE_ALL 0
 #define DUALS_LEAF_ONLY 1
 
-int collect_dual_func(warm_start_desc *ws, bc_node *node,
-					  branch_desc *bpath, branch_desc **bpaths,
-					  int *leaf_depth, int *num_paths, int *num_piece,
-					  int *duals_index_row, int *duals_index_col, double *duals_val, int *nnz_duals,
-					  int *djs_index_row, int *djs_index_col, double *djs_val, int *nnz_djs)
-{
+// Custom hash function for a dual_solution object
+// We use this hash as a proxy of the real key
+// in the hashtable to make things easier
+uint64_t hash_dual(const dual_solution* dual) {
+    uint64_t hash = 17; 
+
+    // Combine the hash values of idx and val arrays
+    for (int i = 0; i < dual->nnz; i++) {
+        // Combine hash with idx value
+        hash = hash * 31 + (uint64_t)(dual->idx[i]);
+        
+        // Combine hash with val value
+		// Multiply by 1e6 to keep trace of decimals
+        hash = hash * 31 + (uint64_t)(dual->val[i] * 1e6); 
+    }
+
+    return hash;
+}
+
+int compare_duals(const dual_solution* a, const dual_solution* b) {
+	if (a == b){
+		// They point at the same object
+		return 0;
+	}
+
+    if (a->nnz != b->nnz) {
+        // Number of non-zero elements is different
+        return 1;
+    }
+
+    for (int i = 0; i < a->nnz; i++) {
+        // Compare each element in idx and val arrays
+        if (a->idx[i] != b->idx[i] || a->val[i] != b->val[i]) {
+            // If any index or value is different, they are not equal
+            return 1;
+        }
+    }
+
+    // They are equal
+    return 0;
+}
+
+int add_dual_to_table(dual_solution **solutions, dual_solution *toAdd){
+    dual_solution *s;
+    uint64_t thisHash = toAdd->hash;
+	int is_added = 0;
+
+    HASH_FIND(hh, *solutions, &thisHash, sizeof(uint64_t), s);
+    if (s == NULL){
+        s = toAdd;
+        HASH_ADD(hh, *solutions, hash, sizeof(uint64_t), s);
+		is_added = 1;
+    } else {
+        if (compare_duals(s, toAdd) != 0){
+			// They collided but are different, add
+            HASH_ADD(hh, *solutions, hash, sizeof(uint64_t), toAdd);
+			is_added = 1;
+        } else {
+            // They are equals
+            is_added = 0;
+        }    
+    }
+	return is_added;
+}
+
+int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
+				  branch_desc *bpath, int* curr_term){
 
 	if (node == NULL)
 	{
@@ -3792,9 +3849,16 @@ int collect_dual_func(warm_start_desc *ws, bc_node *node,
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
 
-	int i, j;
+	int i, j, k, l;
+	int is_added = 0;
+	int varidx, nnz = 0;
+	int lbchange = 0, ubchange = 0; 
 	int level = node->bc_level, child_num = node->bobj.child_num;
+	double zerotol = 1e-7;
+	
 	branch_obj *bobj;
+	dual_solution *dual;
+	disjunction_desc *disj;
 
 	// if level>0, save the branching constraint
 	if (level > 0)
@@ -3804,48 +3868,83 @@ int collect_dual_func(warm_start_desc *ws, bc_node *node,
 				break;
 
 		bobj = &(node->parent->bobj);
-		bpath[level - 1].type = bobj->type;
-		bpath[level - 1].name = bobj->name;
-		bpath[level - 1].sense = bobj->sense[j];
-		bpath[level - 1].rhs = bobj->rhs[j];
-		bpath[level - 1].range = bobj->range[j];
-		bpath[level - 1].branch = bobj->branch[j];
+		
+		// Save branching info
+		if (bobj->type == BRANCHING_VARIABLE){
+			bobj = &(node->parent->bobj);
+			bpath[level - 1].type = bobj->type;
+			bpath[level - 1].name = bobj->name;
+			bpath[level - 1].sense = bobj->sense[j];
+			bpath[level - 1].rhs = bobj->rhs[j];
+			bpath[level - 1].range = bobj->range[j];
+			bpath[level - 1].branch = bobj->branch[j];
+		}
 	}
 
 	// check the policy we want to save dual solutions from the tree
 	if ((ws->dual_func->policy == DUALS_SAVE_ALL) ||
 		(ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num))
 	{
+		dual = (dual_solution *)malloc(sizeof(dual_solution));
+		// find nnzs and fill duals related structures
+		for (i = 0; i < ws->m; i++)
+			if (fabs(node->duals[i]) >= zerotol)
+				nnz++;
 
-		double zerotol = 1e-7;
-		// Check for duplicates, then add
-		if (!dual_is_duplicate(ws, node, duals_index_row, duals_index_col, 
-							   duals_val, *nnz_duals, *num_piece))
-		{
-			// find nnzs and fill duals related structures
+		if (nnz == 0){
+			dual->nnz = 0;
+			dual->idx = NULL;
+			dual->val = NULL;
+		} else {
+			k = 0;
+			dual->nnz = nnz;
+			dual->idx = (int*)malloc(sizeof(int) * nnz);
+			dual->val = (double*)malloc(sizeof(double) * nnz);
 			for (i = 0; i < ws->m; i++)
 			{
 				if (fabs(node->duals[i]) >= zerotol)
 				{
-					duals_index_row[*nnz_duals] = *num_piece;
-					duals_index_col[*nnz_duals] = i;
-					duals_val[*nnz_duals] = node->duals[i];
-					(*nnz_duals)++;
+					dual->idx[k] = i;
+					dual->val[k] = node->duals[i];
+					k++;
 				}
 			}
+		}
 
+		dual->hash = hash_dual(dual);
+		
+		// try to add this dual into the hashtable
+		if (is_added = add_dual_to_table(&(ws->dual_func->duals), dual)){
+			// successfully added, collect reduced costs
+			ws->dual_func->num_pieces = ws->dual_func->num_pieces + is_added;
+			nnz = 0;
+
+			// find nnzs and fill reduced costs related structures
 			for (i = 0; i < ws->n; i++)
-			{
 				if (fabs(node->dj[i]) >= zerotol)
+					nnz++;
+
+			dual->djs = (djs_desc *)malloc(sizeof(djs_desc));
+			if (nnz == 0){
+				dual->djs->nnz = nnz;
+				dual->djs->idx = NULL;
+				dual->djs->val = NULL;
+			} else {
+				k = 0;
+				dual->djs->nnz = nnz;
+				dual->djs->idx = (int*)malloc(sizeof(int) * nnz);
+				dual->djs->val = (double*)malloc(sizeof(double) * nnz);
+				
+				for (i = 0; i < ws->n; i++)
 				{
-					djs_index_row[*nnz_djs] = *num_piece;
-					djs_index_col[*nnz_djs] = i;
-					djs_val[*nnz_djs] = node->dj[i];
-					(*nnz_djs)++;
+					if (fabs(node->dj[i]) >= zerotol)
+					{
+						dual->djs->idx[k] = i;
+						dual->djs->val[k] = node->dj[i];
+						k++;
+					}
 				}
 			}
-
-			(*num_piece)++;
 		}
 
 		// If this is a child, we have a term of the disjunction
@@ -3853,31 +3952,93 @@ int collect_dual_func(warm_start_desc *ws, bc_node *node,
 		{
 			if (level == 0)
 			{
-				assert(*num_paths == 0);
-				bpath = NULL;
-				bpaths[*num_paths] = NULL;
+				assert(ws->num_terms == 0);
 			}
 			else
 			{
-				bpaths[*num_paths] = (branch_desc *)malloc(sizeof(branch_desc) * level);
-				memcpy(bpaths[*num_paths], bpath, sizeof(branch_desc) * level);
-				leaf_depth[*num_paths] = level;
-				(*num_paths)++;
+				disj = (disjunction_desc *)malloc(sizeof(disjunction_desc));
+				double *lb = (double *)malloc(DSIZE * ws->n);
+				double *ub = (double *)malloc(DSIZE * ws->n);
+				memcpy(lb, mip->lb, DSIZE * ws->n);
+				memcpy(ub, mip->ub, DSIZE * ws->n);
+
+				for (int i = 0; i < level; i++){
+					varidx = bpath[i].name;
+					switch (bpath[i].sense)
+					{
+					case 'E':
+						lb[varidx] = bpath[i].rhs;
+						ub[varidx] = bpath[i].rhs;
+						break;
+					case 'L':
+						if (bpath[i].rhs < mip->ub[varidx])
+							ub[varidx] = bpath[i].rhs;
+						break;
+					case 'G':
+						if (bpath[i].rhs > mip->lb[varidx])
+							lb[varidx] = bpath[i].rhs;
+						break;
+					case 'R':
+						printf("Warning: Ranged constraints not handled!\n");
+						exit(1);
+						break;
+					}
+				}
+
+				// count how many lb/ub changed from the original mip
+				for (int i = 0; i < ws->n; i++){
+					if (lb[i] > mip->lb[i])
+						lbchange++;
+					if (ub[i] < mip->ub[i])
+						ubchange++;	
+				}
+
+				disj->lblen = lbchange;
+				disj->ublen = ubchange;
+				if (lbchange == 0){
+					disj->lbvaridx = NULL;
+					disj->lb = NULL;
+				} else {
+					disj->lbvaridx = (int *)malloc(sizeof(int) * lbchange);
+					disj->lb = (double *)malloc(sizeof(double) * lbchange);
+				}
+				if (ubchange == 0){
+					disj->ubvaridx = NULL;
+					disj->ub = NULL;
+				} else {
+					disj->ubvaridx = (int *)malloc(sizeof(int) * ubchange);
+					disj->ub = (double *)malloc(sizeof(double) * ubchange);
+				}
+				
+				// fill
+				l = k = 0;
+				for (int i = 0; i < ws->n; i++){
+					if (lb[i] > mip->lb[i]){
+						disj->lbvaridx[l] = i;
+						disj->lb[l] = lb[i];
+						l++;
+					}
+					if (ub[i] < mip->ub[i]){
+						disj->ubvaridx[k] = i;
+						disj->ub[k] = ub[i];
+						k++;
+					}
+				}
+
+				ws->disj[*curr_term] = *disj;
+				(*curr_term)++;
+				FREE(lb);
+				FREE(ub);
 			}
-		}
+		} 
 	}
 
-	// if child_num>0, then do recursion on child nodes
+	// if child_num > 0, then do recursion on child nodes
 	for (j = 0; j < child_num; j++)
-		collect_dual_func(ws, node->children[j], bpath, bpaths,
-						  leaf_depth, num_paths, num_piece,
-						  duals_index_row, duals_index_col, duals_val, nnz_duals,
-						  djs_index_row, djs_index_col, djs_val, nnz_djs);
+		collect_duals(ws, node->children[j], mip, bpath, curr_term);
 }
 
-/*===========================================================================*/
-
-int build_dual_func(warm_start_desc *ws)
+int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 {
 
 #ifdef SENSITIVITY_ANALYSIS
@@ -3887,85 +4048,29 @@ int build_dual_func(warm_start_desc *ws)
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
 
-	int is_new_df = 0;
-	int num_piece = 0;
-	int nnz_duals = 0;
-	int nnz_djs = 0;
-
 	if (!ws->dual_func)
 	{
-		is_new_df = 1;
 		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
+		ws->dual_func->duals = NULL;
 		ws->dual_func->policy = DUALS_SAVE_ALL;
 	}
 
-	int num_paths = get_num_leaf_nodes(ws->rootnode);
-	ws->num_paths = num_paths;
-	// Allocate the space for the expected number of duals
-	// based on the policy
-	if ((ws->dual_func->policy == DUALS_SAVE_ALL))
-	{
-		ws->num_pieces = ws->stat.tree_size;
-	}
-	else if (ws->dual_func->policy == DUALS_LEAF_ONLY)
-	{
-		ws->num_pieces = num_paths;
-	}
-	else
-	{
-		printf("build_dual_func():\n");
-		printf("Policy not supported.\n");
-		return (FUNCTION_TERMINATED_ABNORMALLY);
-	}
+	int num_leaf = get_num_leaf_nodes(ws->rootnode);
+	ws->num_terms = num_leaf;
 
 	// Allocate memory
-	ws->bpaths = (branch_desc **)malloc(sizeof(branch_desc *) * num_paths);
-	ws->leaf_depth = (int *)malloc(ISIZE * num_paths);
-	// Duals
-	int *duals_index_row = (int *)malloc(ISIZE * ws->num_pieces * ws->m);
-	int *duals_index_col = (int *)malloc(ISIZE * ws->num_pieces * ws->m);
-	double *duals_val = (double *)malloc(DSIZE * ws->num_pieces * ws->m);
-	// Reduced costs
-	int *djs_index_row = (int *)malloc(ISIZE * ws->num_pieces * ws->n);
-	int *djs_index_col = (int *)malloc(ISIZE * ws->num_pieces * ws->n);
-	double *djs_val = (double *)malloc(DSIZE * ws->num_pieces * ws->n);
+	ws->disj = (disjunction_desc*)malloc(sizeof(disjunction_desc) * num_leaf);
 
-	// max_depth allocation for temporary bpath
-	branch_desc *bpath = (branch_desc *)malloc(ws->stat.max_depth *
-											   sizeof(branch_desc));
+	// branching path
+	branch_desc *bpath = (branch_desc *)malloc(sizeof(branch_desc) * (ws->stat.max_depth));
+	int len = 0;
 
-	num_paths = 0;
+	int curr_term = 0;
 
-	collect_dual_func(ws, ws->rootnode, bpath, ws->bpaths, ws->leaf_depth, &num_paths, &num_piece,
-					  duals_index_row, duals_index_col, duals_val, &nnz_duals,
-					  djs_index_row, djs_index_col, djs_val, &nnz_djs);
+	collect_duals(ws, ws->rootnode, mip, bpath, &curr_term);
 
-	// Assert data collected is consistent
-	assert(num_paths == ws->num_paths);
-
-	print_duals(ws, ws->rootnode, bpath, ws->bpaths, ws->leaf_depth, &num_paths, &num_piece,
-				duals_index_row, duals_index_col, duals_val, &nnz_duals,
-				djs_index_row, djs_index_col, djs_val, &nnz_djs);
-
-	// Construct the Dual Function
-	CoinPackedMatrix *duals, *djs;
-	duals = new CoinPackedMatrix(false, duals_index_row,
-								 duals_index_col, duals_val, nnz_duals);
-	djs = new CoinPackedMatrix(false, djs_index_row,
-							   djs_index_col, djs_val, nnz_djs);
-	if (is_new_df)
-	{
-		// New Dual Function
-		ws->dual_func->duals = duals;
-		ws->dual_func->djs = djs;
-	}
-	else
-	{
-		// Already existing Dual Function
-		// We append to the previous, duplicates have been already checked
-		ws->dual_func->duals->bottomAppendPackedMatrix(*duals);
-		ws->dual_func->djs->bottomAppendPackedMatrix(*djs);
-	}
+	FREE(bpath);
+	print_dual_function(ws);
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
 	printf("build_dual_func():\n");
@@ -3975,6 +4080,204 @@ int build_dual_func(warm_start_desc *ws)
 
 #endif
 }
+
+// int collect_dual_func(warm_start_desc *ws, bc_node *node,
+// 					  branch_desc *bpath, branch_desc **bpaths,
+// 					  int *leaf_depth, int *num_paths, int *num_piece,
+// 					  int *duals_index_row, int *duals_index_col, double *duals_val, int *nnz_duals,
+// 					  int *djs_index_row, int *djs_index_col, double *djs_val, int *nnz_djs)
+// {
+
+// 	if (node == NULL)
+// 	{
+// 		printf("Warning: NULL pointer in get_leaf_node_data()\n");
+// 		return (FUNCTION_TERMINATED_ABNORMALLY);
+// 	}
+
+// 	int i, j;
+// 	int level = node->bc_level, child_num = node->bobj.child_num;
+// 	branch_obj *bobj;
+
+
+// 	// if level>0, save the branching constraint
+// 	if (level > 0)
+// 	{
+// 		for (j = 0; j < node->parent->bobj.child_num; j++)
+// 			if (node->parent->children[j] == node)
+// 				break;
+
+// 		bobj = &(node->parent->bobj);
+// 		bpath[level - 1].type = bobj->type;
+// 		bpath[level - 1].name = bobj->name;
+// 		bpath[level - 1].sense = bobj->sense[j];
+// 		bpath[level - 1].rhs = bobj->rhs[j];
+// 		bpath[level - 1].range = bobj->range[j];
+// 		bpath[level - 1].branch = bobj->branch[j];
+// 	}
+
+// 	// check the policy we want to save dual solutions from the tree
+// 	if ((ws->dual_func->policy == DUALS_SAVE_ALL) ||
+// 		(ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num))
+// 	{
+
+// 		double zerotol = 1e-7;
+// 		// Check for duplicates, then add
+// 		if (!dual_is_duplicate(ws, node, duals_index_row, duals_index_col, 
+// 							   duals_val, *nnz_duals, *num_piece))
+// 		{
+// 			// find nnzs and fill duals related structures
+// 			for (i = 0; i < ws->m; i++)
+// 			{
+// 				if (fabs(node->duals[i]) >= zerotol)
+// 				{
+// 					duals_index_row[*nnz_duals] = *num_piece;
+// 					duals_index_col[*nnz_duals] = i;
+// 					duals_val[*nnz_duals] = node->duals[i];
+// 					(*nnz_duals)++;
+// 				}
+// 			}
+
+// 			for (i = 0; i < ws->n; i++)
+// 			{
+// 				if (fabs(node->dj[i]) >= zerotol)
+// 				{
+// 					djs_index_row[*nnz_djs] = *num_piece;
+// 					djs_index_col[*nnz_djs] = i;
+// 					djs_val[*nnz_djs] = node->dj[i];
+// 					(*nnz_djs)++;
+// 				}
+// 			}
+
+// 			(*num_piece)++;
+// 		}
+
+// 		// If this is a child, we have a term of the disjunction
+// 		if (!child_num)
+// 		{
+// 			if (level == 0)
+// 			{
+// 				assert(*num_paths == 0);
+// 				bpath = NULL;
+// 				bpaths[*num_paths] = NULL;
+// 			}
+// 			else
+// 			{
+// 				bpaths[*num_paths] = (branch_desc *)malloc(sizeof(branch_desc) * level);
+// 				memcpy(bpaths[*num_paths], bpath, sizeof(branch_desc) * level);
+// 				leaf_depth[*num_paths] = level;
+// 				(*num_paths)++;
+// 			}
+// 		}
+// 	}
+
+// 	// if child_num>0, then do recursion on child nodes
+// 	for (j = 0; j < child_num; j++)
+// 		collect_dual_func(ws, node->children[j], bpath, bpaths,
+// 						  leaf_depth, num_paths, num_piece,
+// 						  duals_index_row, duals_index_col, duals_val, nnz_duals,
+// 						  djs_index_row, djs_index_col, djs_val, nnz_djs);
+// }
+
+// /*===========================================================================*/
+
+// int build_dual_func(warm_start_desc *ws)
+// {
+
+// #ifdef SENSITIVITY_ANALYSIS
+// 	if (!ws)
+// 	{
+// 		printf("Warning: NULL pointer in collect_aux_data()\n");
+// 		return (FUNCTION_TERMINATED_ABNORMALLY);
+// 	}
+
+// 	int is_new_df = 0;
+// 	int num_piece = 0;
+// 	int nnz_duals = 0;
+// 	int nnz_djs = 0;
+
+// 	if (!ws->dual_func)
+// 	{
+// 		is_new_df = 1;
+// 		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
+// 		ws->dual_func->policy = DUALS_SAVE_ALL;
+// 	}
+
+// 	int num_paths = get_num_leaf_nodes(ws->rootnode);
+// 	ws->num_paths = num_paths;
+// 	// Allocate the space for the expected number of duals
+// 	// based on the policy
+// 	if ((ws->dual_func->policy == DUALS_SAVE_ALL))
+// 	{
+// 		ws->num_pieces = ws->stat.tree_size;
+// 	}
+// 	else if (ws->dual_func->policy == DUALS_LEAF_ONLY)
+// 	{
+// 		ws->num_pieces = num_paths;
+// 	}
+// 	else
+// 	{
+// 		printf("build_dual_func():\n");
+// 		printf("Policy not supported.\n");
+// 		return (FUNCTION_TERMINATED_ABNORMALLY);
+// 	}
+
+// 	// Allocate memory
+// 	ws->bpaths = (branch_desc **)malloc(sizeof(branch_desc *) * num_paths);
+// 	ws->leaf_depth = (int *)malloc(ISIZE * num_paths);
+// 	// Duals
+// 	int *duals_index_row = (int *)malloc(ISIZE * ws->num_pieces * ws->m);
+// 	int *duals_index_col = (int *)malloc(ISIZE * ws->num_pieces * ws->m);
+// 	double *duals_val = (double *)malloc(DSIZE * ws->num_pieces * ws->m);
+// 	// Reduced costs
+// 	int *djs_index_row = (int *)malloc(ISIZE * ws->num_pieces * ws->n);
+// 	int *djs_index_col = (int *)malloc(ISIZE * ws->num_pieces * ws->n);
+// 	double *djs_val = (double *)malloc(DSIZE * ws->num_pieces * ws->n);
+
+// 	// max_depth allocation for temporary bpath
+// 	branch_desc *bpath = (branch_desc *)malloc(ws->stat.max_depth *
+// 											   sizeof(branch_desc));
+
+// 	num_paths = 0;
+
+// 	collect_dual_func(ws, ws->rootnode, bpath, ws->bpaths, ws->leaf_depth, &num_paths, &num_piece,
+// 					  duals_index_row, duals_index_col, duals_val, &nnz_duals,
+// 					  djs_index_row, djs_index_col, djs_val, &nnz_djs);
+
+// 	// Assert data collected is consistent
+// 	assert(num_paths == ws->num_paths);
+
+// 	print_duals(ws, ws->rootnode, bpath, ws->bpaths, ws->leaf_depth, &num_paths, &num_piece,
+// 				duals_index_row, duals_index_col, duals_val, &nnz_duals,
+// 				djs_index_row, djs_index_col, djs_val, &nnz_djs);
+
+// 	// Construct the Dual Function
+// 	CoinPackedMatrix *duals, *djs;
+// 	duals = new CoinPackedMatrix(false, duals_index_row,
+// 								 duals_index_col, duals_val, nnz_duals);
+// 	djs = new CoinPackedMatrix(false, djs_index_row,
+// 							   djs_index_col, djs_val, nnz_djs);
+// 	if (is_new_df)
+// 	{
+// 		// New Dual Function
+// 		ws->dual_func->duals = duals;
+// 		ws->dual_func->djs = djs;
+// 	}
+// 	else
+// 	{
+// 		// Already existing Dual Function
+// 		// We append to the previous, duplicates have been already checked
+// 		ws->dual_func->duals->bottomAppendPackedMatrix(*duals);
+// 		ws->dual_func->djs->bottomAppendPackedMatrix(*djs);
+// 	}
+// 	return (FUNCTION_TERMINATED_NORMALLY);
+// #else
+// 	printf("build_dual_func():\n");
+// 	printf("Sensitivity analysis features are not enabled.\n");
+// 	printf("Please rebuild SYMPHONY with these features enabled\n");
+// 	return (FUNCTION_TERMINATED_ABNORMALLY);
+
+// #endif
+// }
 
 /*===========================================================================*/
 // TODO: 
