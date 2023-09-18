@@ -52,6 +52,8 @@ typedef struct TM_PARAMS{
    double      diving_threshold;
    int         node_selection_rule;
 
+// feb223
+   int         keep_dual_function_description;
    int         keep_description_of_pruned;
    int         vbc_emulation;
    char        vbc_emulation_file_name[MAX_FILE_NAME_LENGTH +1];

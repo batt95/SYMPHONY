@@ -4053,6 +4053,9 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
 		ws->dual_func->duals = NULL;
 		ws->dual_func->policy = DUALS_SAVE_ALL;
+	} else {
+		// Delete the previous disjunction, there will be a new one
+		FREE(ws->disj);
 	}
 
 	int num_leaf = get_num_leaf_nodes(ws->rootnode);

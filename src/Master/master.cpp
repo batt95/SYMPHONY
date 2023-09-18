@@ -278,6 +278,8 @@ SYMPHONYLIB_EXPORT int sym_set_defaults(sym_environment *env)
    tm_par->diving_threshold = 0.05;
    tm_par->node_selection_rule = LOWEST_LP_FIRST;
    tm_par->keep_description_of_pruned = DISCARD;
+   // feb223
+   tm_par->keep_dual_function_description = DISCARD;
 
    tm_par->warm_start = FALSE;
    tm_par->warm_start_node_ratio = 0.0;
@@ -1249,7 +1251,12 @@ SYMPHONYLIB_EXPORT int sym_solve(sym_environment *env)
    }
  
    /* Now the tree manager owns everything */
-   FREE(env->warm_start);
+   // feb223
+   // If the user wants to build a dual function, 
+   // then warm_start must be kept, otherwise
+   // dual solutions from previous solve will be destroyed
+   if (env->par.tm_par.keep_dual_function_description == DISCARD)
+      FREE(env->warm_start);
    
    if ((termcode = tm_initialize(tm , base, rootdesc)) < 0){
       tm_close(tm, termcode);
@@ -1441,7 +1448,13 @@ SYMPHONYLIB_EXPORT int sym_solve(sym_environment *env)
    tm_close(tm, termcode);
 
    /* Save the warm start info */
-   env->warm_start = (warm_start_desc *) calloc (1, sizeof(warm_start_desc));
+   // feb223
+   // Allocate a new warm_start_desc only if the user doesn't want
+   // to keep a dual function description, otherwise keep the previous
+   // and update fields from the current iteration
+   if (!(env->warm_start) || 
+       env->par.tm_par.keep_dual_function_description == DISCARD)
+      env->warm_start = (warm_start_desc *) calloc (1, sizeof(warm_start_desc));
    env->warm_start->rootnode = tm->rootnode;
    env->warm_start->cuts = env->tm->cuts;
    env->warm_start->cut_num = env->tm->cut_num;
@@ -7444,6 +7457,15 @@ SYMPHONYLIB_EXPORT int sym_set_param(sym_environment *env, char *line)
    } else
 	 tm_par->keep_description_of_pruned = 
 	   lp_par->keep_description_of_pruned = DISCARD;
+      return(0);
+   }
+   // feb223
+   else if(strcmp(key, "keep_dual_function_description") == 0){
+      if (value[0]){
+	 tm_par->keep_dual_function_description = KEEP_IN_MEMORY;
+         return(0);
+   } else
+	 tm_par->keep_dual_function_description = DISCARD;
       return(0);
    }
    else if (strcmp(key, "warm_start") == 0 ||
