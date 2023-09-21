@@ -1623,6 +1623,11 @@ int generate_children(tm_prob *tm, bc_node *node, branch_obj *bobj,
             //Ted
             child->dj = bobj->dj[i];
             bobj->dj[i] = 0;
+            // feb223
+            child->basis_idx = bobj->basis_idx[i];
+            child->basis_len = bobj->basis_len[i];
+            bobj->basis_idx[i] = NULL;
+            
          }      
 #endif
       } else if (node_status == NODE_STATUS__PRUNED){

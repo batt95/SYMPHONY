@@ -594,11 +594,23 @@ void send_node_desc(lp_prob *p, int node_type)
 	 }
 	 n->dj = p->dj;
 	 p->dj = NULL;
+
+    // feb223
+   if (n->basis_idx){
+      FREE(n->basis_idx);
+      n->basis_len = 0;
+   }
+   n->basis_idx = p->basis_idx;
+   n->basis_len = p->basis_len;
+	p->basis_idx = NULL;
+   p->basis_len = 0;
       }
    }
 
    //Anahita
    n->intcpt = lp_data->intcpt;
+
+
 #endif
 
 #ifdef SYM_COMPILE_IN_LP

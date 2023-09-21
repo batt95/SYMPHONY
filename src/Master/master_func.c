@@ -3778,23 +3778,41 @@ void print_dual_function(warm_start_desc *ws)
 // Custom hash function for a dual_solution object
 // We use this hash as a proxy of the real key
 // in the hashtable to make things easier
-uint64_t hash_dual(const dual_solution* dual) {
-    uint64_t hash = 17; 
+int hash_dual(const dual_solution* dual) {
+    // int64_t hash = 17; 
 
-    // Combine the hash values of idx and val arrays
-    for (int i = 0; i < dual->nnz; i++) {
-        // Combine hash with idx value
-        hash = hash * 31 + (uint64_t)(dual->idx[i]);
+    // // Combine the hash values of idx and val arrays
+    // for (int i = 0; i < dual->nnz; i++) {
+    //     // Combine hash with idx value
+    //     hash = hash * 31 + (int64_t)(dual->idx[i]);
         
+    //     // Combine hash with val value
+	// 	// Multiply by 1e6 to keep trace of decimals
+    //     hash = hash * 31 + (int64_t)(dual->val[i] * 1e6); 
+    // }
+
+    // return hash;
+
+	int hash = 37;
+    int int_hash;
+    // Iterate over the array of floats and update the hash
+    for (int i = 0; i < dual->nnz; i++) {
+        int_hash = 0;
+        // Convert the float to an integer representation
+        int_hash = int_hash * 73 + (dual->idx[i]);
+
         // Combine hash with val value
-		// Multiply by 1e6 to keep trace of decimals
-        hash = hash * 31 + (uint64_t)(dual->val[i] * 1e6); 
+        int_hash = int_hash * 31 + (int)(dual->val[i] * 1000000);
+        // XOR the integer representation with the current hash
+        hash ^= int_hash;
     }
+
 
     return hash;
 }
 
 int compare_duals(const dual_solution* a, const dual_solution* b) {
+	double zerotol = 1e-7;
 	if (a == b){
 		// They point at the same object
 		return 0;
@@ -3807,7 +3825,7 @@ int compare_duals(const dual_solution* a, const dual_solution* b) {
 
     for (int i = 0; i < a->nnz; i++) {
         // Compare each element in idx and val arrays
-        if (a->idx[i] != b->idx[i] || a->val[i] != b->val[i]) {
+        if (a->idx[i] != b->idx[i] || fabs(a->val[i] - b->val[i]) > zerotol) {
             // If any index or value is different, they are not equal
             return 1;
         }
@@ -3819,18 +3837,18 @@ int compare_duals(const dual_solution* a, const dual_solution* b) {
 
 int add_dual_to_table(dual_solution **solutions, dual_solution *toAdd){
     dual_solution *s;
-    uint64_t thisHash = toAdd->hash;
+    int thisHash = toAdd->hash;
 	int is_added = 0;
 
-    HASH_FIND(hh, *solutions, &thisHash, sizeof(uint64_t), s);
+    HASH_FIND(hh, *solutions, &thisHash, sizeof(int), s);
     if (s == NULL){
         s = toAdd;
-        HASH_ADD(hh, *solutions, hash, sizeof(uint64_t), s);
+        HASH_ADD(hh, *solutions, hash, sizeof(int), s);
 		is_added = 1;
     } else {
         if (compare_duals(s, toAdd) != 0){
 			// They collided but are different, add
-            HASH_ADD(hh, *solutions, hash, sizeof(uint64_t), toAdd);
+            HASH_ADD(hh, *solutions, hash, sizeof(int), toAdd);
 			is_added = 1;
         } else {
             // They are equals
@@ -3860,6 +3878,13 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	dual_solution *dual;
 	disjunction_desc *disj;
 
+	printf("Basis\n");
+	for (int i = 0; i < node->basis_len; i++){
+			printf("%d ", node->basis_idx[i]);
+	}
+	printf("\n");
+	printf("Dual: %.3f\n", node->duals[0]);
+	
 	// if level>0, save the branching constraint
 	if (level > 0)
 	{

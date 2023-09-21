@@ -1548,9 +1548,15 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 	 if (p->par.sensitivity_bounds){
 	    //Ted
 	    can->dj = (double **) calloc(maxnum, sizeof(double *));
+		// feb223
+		can->basis_idx = (int **) calloc(maxnum, sizeof(int *));
+		can->basis_len =  (int *) calloc(maxnum, sizeof(int));
 	 }else{
 	    //Ted
 	    can->dj = NULL; 
+		// feb223
+		can->basis_idx = NULL;
+		can->basis_len = NULL;
          }
 #endif
 #ifdef COMPILE_FRAC_BRANCHING
@@ -1581,9 +1587,15 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
          if (p->par.sensitivity_bounds){      
             //Ted
 	    can->dj = (double **) calloc (MAX_CHILDREN_NUM, sizeof(double *));
+		// feb223
+		can->basis_idx = (int **) calloc(MAX_CHILDREN_NUM, sizeof(int *));
+		can->basis_len =  (int *) calloc(MAX_CHILDREN_NUM, sizeof(int));
          }else{
 	    //Ted
 	    can->dj = NULL;
+		// feb223
+		can->basis_idx = NULL;
+		can->basis_len = NULL;
          }
 #endif
 #endif
@@ -1723,6 +1735,11 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 		     //Ted
 		     can->dj[j] = (double *) malloc (DSIZE*p->lp_data->n);
 		     memcpy(can->dj[j], lp_data->dj, DSIZE*p->lp_data->n);
+			// feb223
+			int len = 0;
+			can->basis_len[j] = p->lp_data->basis_len;
+			can->basis_idx[j] = (int *)malloc(ISIZE * can->basis_len[j]);
+			memcpy(can->basis_idx[j], p->lp_data->basis_idx, p->lp_data->basis_len);
 		  }
 	       }
 #endif
@@ -1847,6 +1864,11 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 		     //Ted
 		     can->dj[j] = (double *) malloc (DSIZE*p->lp_data->n);
 		     memcpy(can->dj[j], lp_data->dj, DSIZE*p->lp_data->n);
+			 // feb223
+			int len = 0;
+			can->basis_len[j] = p->lp_data->basis_len;
+			can->basis_idx[j] = (int *)malloc(ISIZE * can->basis_len[j]);
+			memcpy(can->basis_idx[j], p->lp_data->basis_idx, p->lp_data->basis_len);
 		  }
 	       }
 #endif

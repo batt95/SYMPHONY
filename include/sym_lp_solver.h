@@ -206,7 +206,9 @@ typedef struct LPDATA{
    //Anahita
    double    *raysol;
    double    intcpt;
-   //
+   // feb223
+   int       *basis_idx;
+   int        basis_len;
 #endif
    double    *slacks;      /* maxm */
    double    *ub;

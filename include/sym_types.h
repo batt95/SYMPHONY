@@ -293,6 +293,9 @@ typedef struct BRANCH_OBJ{
    double      **rays;
    //Ted
    double      **dj;
+   // feb223
+   int      **basis_idx;
+   int       *basis_len;
 #endif
 }branch_obj;
 
@@ -406,6 +409,9 @@ typedef struct BC_NODE{
    double     intcpt;
    //Ted
    double    *dj;
+   // feb223
+   int    *basis_idx;
+   int     basis_len;
 
    double     C_LP;
    double     B_IP;
@@ -915,7 +921,7 @@ typedef struct DJS_DESC {
 
 // uthash.h hashtable is used to keep unique dual solutions
 typedef struct DUAL_SOLUTION {
-    uint64_t    hash;       // field to make this struct hashable
+    int         hash;       // field to make this struct hashable
     int         *idx;       // nnz idx dual multipliers
     double      *val;       // nnz val dual multipliers
     int         nnz;        // length of idx and val pointers

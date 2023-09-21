@@ -125,6 +125,11 @@ typedef struct LP_PROB{
    double        objval; /* To save the objective value of the node */
    double       *dualsol; /* To save the duals of the node */
    double       *dj; /* To save the reduced costs of the node */
+   /************************************************************/
+   // feb223
+   int          *basis_idx; /* To save the LP basis of the node */
+   int           basis_len; /* Length of the basis <= n + m */
+   /************************************************************/
    MIPdesc      *mip; /* Holds the MIP description when read in from MPS */
    
    double        last_gap;
