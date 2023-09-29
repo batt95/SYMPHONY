@@ -6913,6 +6913,12 @@ SYMPHONYLIB_EXPORT int sym_build_dual_func(sym_environment *env) {
    return build_dual_func(env->warm_start, env->mip);
 }
 
+SYMPHONYLIB_EXPORT int sym_evaluate_dual_function(sym_environment *env, 
+                              double *new_rhs, int size_new_rhs, double *dual_bound) {
+   return evaluate_dual_function(env->warm_start, env->mip, new_rhs, 
+                                          size_new_rhs, dual_bound);
+}
+
 SYMPHONYLIB_EXPORT int sym_print_dual_func(warm_start_desc *ws) {
    print_dual_function(ws);
    return 1;

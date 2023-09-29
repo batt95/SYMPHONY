@@ -5,10 +5,6 @@
 #include <math.h>
 #include <time.h>
 
-// feb223
-// should we use the Osi Interface?
-// #include "OsiSymSolverInterface.hpp"
-
 #include "symphony.h"
 // feb223
 // These paths should be changed
@@ -71,11 +67,11 @@ int main(int argc, char **argv)
       
    double inf = 1e30;
    int i = 0, termcode;
-   int numRhs = 3;
+   int numRhs = 23;
    int n = 6;
    int m = 1;
 
-   double rhs[numRhs] = {11.5, 4, 10};
+   double rhs[numRhs] = {-11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
    double *coeff = (double *) malloc(n * sizeof(double));
    double *warmCoeff = (double *) malloc(n * sizeof(double));
    double *coldCoeff = (double *) malloc(n * sizeof(double));
@@ -85,28 +81,30 @@ int main(int argc, char **argv)
    double *warmSol = (double *) malloc(n * sizeof(double));
    double *duals = (double *) malloc(m * sizeof(double));
 
-
    int* rhs_ind = (int *) malloc(m * sizeof(int));
    double *lb_rhs = (double *) malloc(sizeof(double));
-
-   printf("%d\n", sizeof(warm_start_desc));
    
+   sym_environment *env_cold = sym_open_environment(); 
    sym_environment *env_warm = sym_open_environment(); 
 
    // Maybe we need to store the warm_start_desc
    warm_start_desc * ws; 
 
    sym_parse_command_line(env_warm, argc, argv); 
+   sym_parse_command_line(env_cold, argc, argv); 
 
    sym_load_problem(env_warm);
+   sym_load_problem(env_cold);
 
    sym_set_int_param(env_warm, "verbosity", -2);
+   sym_set_int_param(env_cold, "verbosity", -2);
 
    // feb223
    // Those are the parameters to be set in order to 
    // keep the branch-and-bound tree valid for RHS changes
    // (E.g. Cuts and reduced cost fixing are not RHS-invariant)
    sym_set_int_param(env_warm, "keep_warm_start", TRUE);
+   sym_set_int_param(env_warm, "keep_dual_function_description", TRUE);
    sym_set_int_param(env_warm, "should_use_rel_br", FALSE);
    sym_set_int_param(env_warm, "use_hot_starts", FALSE);
    sym_set_int_param(env_warm, "should_warmstart_node", TRUE);
@@ -126,7 +124,6 @@ int main(int argc, char **argv)
    if ((termcode = sym_solve(env_warm)) < 0){
       printf("WARM: PROBLEM INFEASIBLE!\n");
    }
-   dual_func_desc *df;
 
    sym_build_dual_func(env_warm);
    
@@ -137,7 +134,18 @@ int main(int argc, char **argv)
    for (int j = 0; j < n; j++){
       printf("X%d : %.5f\n", j, warmSol[j]);
    }
-   df = env_warm->warm_start->dual_func;
+
+   double lb = 0.0;
+   double dual_bound;
+   double peppe = 5.5;
+   
+   // sym_evaluate_dual_function(env_warm, &(peppe), 1, &dual_bound);
+   // assert(fabs(dual_bound - *warmObjVal) < 1e-5);
+   // for(int i = 0; i < numRhs; i++){
+   //    printf("=================================\n");
+   //    printf("RHS %f\n", rhs[i]);
+   //    sym_evaluate_dual_function(env_warm, &(rhs[i]), 1, &dual_bound);
+   // }
 
    // -----------------------------------------------------
    // RHS Test 
@@ -146,27 +154,36 @@ int main(int argc, char **argv)
       printf("=================================\n");
       // Set the new RHS
       printf("RHS %f\n", rhs[i]);
-      sym_set_row_upper(env_warm, 0, rhs[i]);
-      sym_set_row_lower(env_warm, 0, rhs[i]);
+      sym_set_row_upper(env_cold, 0, rhs[i]);
+      sym_set_row_lower(env_cold, 0, rhs[i]);
 
       // Warm solve
-      if ((termcode = sym_warm_solve(env_warm)) < 0){
+      // if ((termcode = sym_warm_solve(env_warm)) < 0){
+      //    printf("PROBLEM INFEASIBLE!\n");
+      // } 
+
+      // Cold solve
+      if ((termcode = sym_solve(env_cold)) < 0){
          printf("PROBLEM INFEASIBLE!\n");
       } 
-      env_warm->warm_start->dual_func = df;
-      sym_build_dual_func(env_warm);
-      sym_get_obj_val(env_warm, warmObjVal);
-      printf("WARM OBJ : %.5f\n", *warmObjVal);
 
-      sym_get_col_solution(env_warm, warmSol);
-      for (int j = 0; j < n; j++){
-         printf("X%d : %.5f\n", j, warmSol[j]);
-      }
+      sym_get_obj_val(env_cold, warmObjVal);
+
+      sym_evaluate_dual_function(env_warm, &(rhs[i]), 1, &dual_bound);
+      
+      printf("OPT OBJ : %.5f,DUAL FUNC: %.5f\n", *warmObjVal, dual_bound);
+      assert(dual_bound < *warmObjVal || fabs(dual_bound - *warmObjVal) < 1e-5);
+
+      // sym_get_col_solution(env_warm, warmSol);
+      // for (int j = 0; j < n; j++){
+      //    printf("X%d : %.5f\n", j, warmSol[j]);
+      // }
       // print_tree(ws->rootnode);
    
    }
    printf("ENDING\n");
 
    sym_close_environment(env_warm);
+   sym_close_environment(env_cold);
    return 0;
 }  

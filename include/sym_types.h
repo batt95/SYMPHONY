@@ -32,6 +32,7 @@
 
 // feb223
 #include "uthash/uthash.h"
+#include "CoinPackedMatrix.hpp"
 
 typedef struct LP_SOL{
    int            lp;          /* the tid of the lp process asssociated with
@@ -929,12 +930,12 @@ typedef struct DUAL_SOLUTION {
     UT_hash_handle hh;      // hashmap handler
 } dual_solution;
 
-typedef struct DUAL_FUNC_DESC{
-   // dual pieces and reduced costs
-   dual_solution  *duals;
-   int             num_pieces;
-   int             policy;      
-}dual_func_desc;
+// uthash.h hashtable is used to keep unique dual solutions
+typedef struct DUAL_HASH {
+    int           *basis_idx; // idx of basic vars and slacks
+    int            len;       // length of basis_idx
+    UT_hash_handle hh;        // hashmap handler
+} dual_hash;
 
 typedef struct DISJUNCTION_DESC{
    int            *lbvaridx;     
@@ -944,6 +945,19 @@ typedef struct DISJUNCTION_DESC{
    double         *ub;
    int             ublen;
 } disjunction_desc;
+
+typedef struct DUAL_FUNC_DESC{
+   // dual_solution      *duals;
+   // int                 num_pieces;
+   int                 policy;
+   dual_hash          *hashtb;
+   int                 num_pieces;
+   // dual pieces and reduced costs
+   CoinPackedMatrix   *duals;
+   // disjunction description
+   disjunction_desc   *disj;
+   int                 num_terms;     // num of disjunction terms     
+}dual_func_desc;
 
 typedef struct WARM_START_DESC{
    bc_node           *rootnode;
@@ -966,9 +980,6 @@ typedef struct WARM_START_DESC{
    int                 m;             // Num of constraint in the original MIPdesc
    int                 n;             // Num of variables in the original MIPdesc
    dual_func_desc     *dual_func;
-   disjunction_desc   *disj;          // Disjunction of the tree
-   int                 num_terms;     // num of disjunction terms
-   int                 num_pieces;    // number of duals
 #endif
 
 }warm_start_desc;

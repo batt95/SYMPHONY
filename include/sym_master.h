@@ -189,3 +189,8 @@ int sym_print_dual_func PROTO((warm_start_desc * ws));
 void print_dual_function PROTO((warm_start_desc * ws));
 
 int build_dual_func PROTO((warm_start_desc *ws, MIPdesc *mip));
+int evaluate_dual_function PROTO((warm_start_desc *ws, MIPdesc *mip, 
+						double *new_rhs, int size_new_rhs, double *dual_bound));
+
+int sym_evaluate_dual_function PROTO((sym_environment * env, 
+							double *new_rhs, int size_new_rhs, double *dual_bound));

@@ -1,17 +1,19 @@
 NAME	simple_milp
 ROWS
  N 	 OBJROW
- E	 R0 
+ L	 R0 
+ G   R1
 COLUMNS
- X0	 OBJROW 	3	 R0 	6	
- X1	 OBJROW 	3.5	 R0 	5	
- X2	 OBJROW 	3	 R0 	-4	
- X3	 OBJROW 	6	 R0     2	
- X4	 OBJROW 	7	 R0 	-7	
- X5	 OBJROW 	5	 R0 	1	
+ X0	 OBJROW 	6	 R0 	2	 R1     1
+ X1	 OBJROW 	4	 R0 	5	 R1     1
+ X2	 OBJROW 	3	 R0 	-2	 R1     1
+ X3	 OBJROW 	4	 R0     -2	 R1     1
+ X4	 OBJROW 	5	 R0 	5	 R1     1
+ X5	 OBJROW 	7	 R0 	5	 R1     1
 
 RHS
- RHS	 R0 	 -10
+ RHS	 R0 	 5.5
+ RHS	 R1 	 1
 BOUNDS
  UI BOUND	X0	 1e+30	
  UI BOUND	X1	 1e+30	
