@@ -6848,7 +6848,7 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
          // Root node
          printf ("Id %d level %d, root->node_status is %d and node->feasibility_status is %d.\n", node->bc_index, node->bc_level, node->node_status, node->feasibility_status);
          if (node->duals){
-            printf("root has duals! %.2f \n", node->duals[0]);
+            printf("root has duals! %.5f, %.5f \n", node->duals[0], node->duals[1]);
          }
          if (node->dj){
             printf("root has dj\n");
@@ -6856,7 +6856,6 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
                printf("%.3f\n", node->dj[j]);
             }
          }
-         printf("Intercept %.2f \n", node->intcpt);
 
          if (!node->children) {
             printf("Leaf node!\n");
@@ -6866,7 +6865,7 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
                       j, node->bobj.name, node->bobj.sense[j], node->bobj.rhs[j]);
             }
          }
-
+         printf("Bound: %.5f\n", node->lower_bound);
          printf("--------------------------\n");
       } else {
 
@@ -6874,8 +6873,11 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
          printf("Parent: %d\n", node->parent->bc_index);
 
          if (node->duals){
-            printf("node has duals! %.2f \n", node->duals[0]);
-            printf("Intercept %.2f \n", node->intcpt);
+            printf("node has duals! %.5f, %.5f \n", node->duals[0], node->duals[1]);
+         }
+
+         if (node->rays){
+            printf("node has rays! %.5f, %.5f \n", node->rays[0], node->rays[1]);
          }
          if (node->dj){
             printf("node has dj\n");
@@ -6886,16 +6888,13 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
 
          if (!node->children) {
             printf("Leaf node!\n");
-            if (node->duals){
-            printf("node has duals! %.2f \n", node->duals[0]);
-            printf("Intercept %.2f \n", node->intcpt);
-         }
          } else {
             for (int j = 0; j < node->bobj.child_num; j++){
                printf("%d : Branched on X_%d %c %.3f\n",
                       j, node->bobj.name, node->bobj.sense[j], node->bobj.rhs[j]);
             }
          }
+         printf("Bound: %.5f\n", node->lower_bound);
          printf("--------------------------\n");
       }   
       // Children
@@ -6922,6 +6921,56 @@ SYMPHONYLIB_EXPORT int sym_evaluate_dual_function(sym_environment *env,
 SYMPHONYLIB_EXPORT int sym_print_dual_func(warm_start_desc *ws) {
    print_dual_function(ws);
    return 1;
+}
+
+SYMPHONYLIB_EXPORT int check_dual_solutions(MIPdesc *mip, dual_func_desc *df){
+   int first, last;
+   int k, idx;
+   int n = mip->n, m = mip->m, nz = mip->nz;
+   int *matind = (mip->matind);
+   int *matbeg = (mip->matbeg);
+   double *matval = (mip->matval);
+   int ok = FALSE;
+   
+   double *obj = (mip->obj);
+   double *rhs; 
+
+   const double* elem = df->duals->getElements();
+   const int* indices = df->duals->getIndices();
+
+   for (int i = 0; i < df->num_pieces; i++){
+      k = 0;
+      rhs = (double *)calloc(n, DSIZE);
+      first = df->duals->getVectorFirst(i);
+		last = df->duals->getVectorLast(i);
+      idx = -1;
+      for (k = 0; k < nz; k++){
+         if (matind[k] == 0) idx++;
+         for (int j = first; j < last; ++j){
+            if (matind[k] == indices[j]){
+               // printf("%d : %d - %.2f : %.2f \n", indices[j], idx, elem[j], matval[k]);
+               rhs[idx] += elem[j] * matval[k];
+            }
+		   }
+      }
+
+      for (int j = first; j < last; j++){
+         if (indices[j] >= m){
+            // printf("%d : %.3f \n", indices[j] - m, elem[j]);
+            rhs[indices[j] - m] += elem[j];
+         }
+      }
+      ok = TRUE;
+      for (int j = 0; j < n; j++){
+         // printf("%d \n", j);
+         if(rhs[j] - obj[j] > 1e-5) 
+            ok = FALSE;
+      }
+      if(ok)
+         printf("DUAL %d OK!\n", i);
+      else
+         printf("DUAL %d NOT FEASIBLE!\n", i);
+   }
 }
 
 /*===========================================================================*/

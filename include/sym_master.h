@@ -194,3 +194,5 @@ int evaluate_dual_function PROTO((warm_start_desc *ws, MIPdesc *mip,
 
 int sym_evaluate_dual_function PROTO((sym_environment * env, 
 							double *new_rhs, int size_new_rhs, double *dual_bound));
+
+int check_dual_solutions PROTO((MIPdesc *mip, dual_func_desc *df));

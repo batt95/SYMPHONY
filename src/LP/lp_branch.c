@@ -1739,9 +1739,13 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 			int len = 0;
 			can->basis_len[j] = p->lp_data->basis_len;
 			can->basis_idx[j] = (int *)malloc(ISIZE * can->basis_len[j]);
-			memcpy(can->basis_idx[j], p->lp_data->basis_idx, p->lp_data->basis_len);
+			memcpy(can->basis_idx[j], p->lp_data->basis_idx, 
+					ISIZE * p->lp_data->basis_len);
+			for (int i = 0; i < p->lp_data->basis_len; i++){
+				assert(can->basis_idx[j][i] == p->lp_data->basis_idx[i]);
+			}
 		  }
-	       }
+	    }
 #endif
 
                if (can->termcode[j] == LP_OPTIMAL){
@@ -1868,7 +1872,8 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 			int len = 0;
 			can->basis_len[j] = p->lp_data->basis_len;
 			can->basis_idx[j] = (int *)malloc(ISIZE * can->basis_len[j]);
-			memcpy(can->basis_idx[j], p->lp_data->basis_idx, p->lp_data->basis_len);
+			memcpy(can->basis_idx[j], p->lp_data->basis_idx, 
+			ISIZE * p->lp_data->basis_len);
 		  }
 	       }
 #endif

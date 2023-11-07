@@ -3015,7 +3015,34 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       if (term == LP_D_UNBOUNDED && lp_data->raysol)
       {
          get_dual_ray(lp_data);
+         // feb223
+         int len = 0;
+         int *cstat = (int *)malloc(ISIZE * lp_data->maxn);
+         int *rstat = (int *)malloc(ISIZE * lp_data->maxm);
+         get_basis(lp_data, cstat, rstat);
+         for (int i = 0; i < lp_data->maxn; i++){
+            if(cstat[i] == VAR_BASIC){
+               lp_data->basis_idx[len] = i;
+               len++;
+            }
+         }
+         for (int i = 0; i < lp_data->maxm; i++){
+            if(rstat[i] == VAR_BASIC){
+               lp_data->basis_idx[len] = lp_data->maxn + i;
+               len++;
+            }
+         }
+         lp_data->basis_len = len;
       }
+
+      for (int i = 0; i < lp_data->basis_len; i++){
+         printf("%d ", lp_data->basis_idx[i]);
+      }
+      printf(" | ");
+      for (int i = 0; i < lp_data->maxm; i++){
+         printf("%.5f ", lp_data->dualsol[i]);
+      }
+      printf("\n");
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3172,13 +3199,41 @@ int dual_simplex(LPdata *lp_data, int *iterd)
          }
 
          lp_data->basis_len = len;
+      
       }
 
       // Anahita
       if (term == LP_D_UNBOUNDED && lp_data->raysol)
       {
          get_dual_ray(lp_data);
+         // feb223
+         int len = 0;
+         int *cstat = (int *)malloc(ISIZE * lp_data->maxn);
+         int *rstat = (int *)malloc(ISIZE * lp_data->maxm);
+         get_basis(lp_data, cstat, rstat);
+         for (int i = 0; i < lp_data->maxn; i++){
+            if(cstat[i] == VAR_BASIC){
+               lp_data->basis_idx[len] = i;
+               len++;
+            }
+         }
+         for (int i = 0; i < lp_data->maxm; i++){
+            if(rstat[i] == VAR_BASIC){
+               lp_data->basis_idx[len] = lp_data->maxn + i;
+               len++;
+            }
+         }
+         lp_data->basis_len = len;
       }
+
+      for (int i = 0; i < lp_data->basis_len; i++){
+         printf("%d ", lp_data->basis_idx[i]);
+      }
+      printf(" | ");
+      for (int i = 0; i < lp_data->maxm; i++){
+         printf("%.5f ", lp_data->dualsol[i]);
+      }
+      printf("\n");
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3310,6 +3365,25 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
       if (term == LP_D_UNBOUNDED && lp_data->raysol)
       {
          get_dual_ray(lp_data);
+
+         // feb223
+         int len = 0;
+         int *cstat = (int *)malloc(ISIZE * lp_data->maxn);
+         int *rstat = (int *)malloc(ISIZE * lp_data->maxm);
+         get_basis(lp_data, cstat, rstat);
+         for (int i = 0; i < lp_data->maxn; i++){
+            if(cstat[i] == VAR_BASIC){
+               lp_data->basis_idx[len] = i;
+               len++;
+            }
+         }
+         for (int i = 0; i < lp_data->maxm; i++){
+            if(rstat[i] == VAR_BASIC){
+               lp_data->basis_idx[len] = lp_data->maxn + i;
+               len++;
+            }
+         }
+         lp_data->basis_len = len;
       }
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
@@ -3591,6 +3665,8 @@ void get_dj_pi(LPdata *lp_data)
 void get_dual_ray(LPdata *lp_data)
 {
    std::vector<double *> vRays;
+   // vRays = lp_data->si->getDualRays(1, true);
+   
    vRays = lp_data->si->getDualRays(1, false);
 
    // check that there is at least one ray
@@ -3619,6 +3695,7 @@ void get_dual_ray(LPdata *lp_data)
    {
       double *ray = NULL;
    }
+   
 }
 
 /*===========================================================================*/

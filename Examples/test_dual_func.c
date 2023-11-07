@@ -42,7 +42,8 @@ int main(int argc, char **argv)
 {   
    
    int termcode;
-   int numTests = 10;
+   int numTrain = 10;
+   int numTests = 10000;
    double warmObjVal, coldObjVal, dualFuncObj;
 
    sym_environment *env_cold = sym_open_environment(); 
@@ -85,11 +86,75 @@ int main(int argc, char **argv)
    if ((termcode = sym_solve(env_warm)) < 0){
       printf("WARM: PROBLEM INFEASIBLE!\n");
    }
-
+   print_tree(env_warm->warm_start->rootnode);
    sym_build_dual_func(env_warm);
+
+   check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
    
    sym_get_obj_val(env_warm, &warmObjVal);
    printf("WARM OBJ : %.5f\n", warmObjVal);
+
+   double *rhss = (double *)malloc(sizeof(double) * numTrain * m);
+   int count = 0;
+
+   rhss[0] = 1500.00;
+   rhss[1] = 1500.00;
+
+   sym_evaluate_dual_function(env_warm, rhss, m, &dualFuncObj);
+
+   assert(warmObjVal == dualFuncObj);
+
+
+   // Build a dual function from a bunch of RHSs
+   for (int i = 0; i < numTrain; i++){
+      printf("=================================\n");
+      
+      printf("RHS %d\n", i);
+
+      // Generate a random new rhs
+      generate_rand_array(m, 0, 5000, rhs);
+
+      rhss[count++] = rhs[0];
+      rhss[count++] = rhs[1];
+      
+      // Set the new RHS
+      set_rhs(env_warm, rhs, m);
+
+      if ((termcode = sym_warm_solve(env_warm)) < 0){
+         printf("PROBLEM INFEASIBLE!\n");
+      }
+
+      sym_build_dual_func(env_warm);
+
+      check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
+   }
+
+   count = 0;
+
+   // Assert the dual function remain strong for previous RHSs
+   for (int i = 0; i < numTrain; i++){
+      printf("=================================\n");
+      
+      printf("RHS %d\n", i);
+      printf("RHS: (%.2f, %.2f)\n", (rhss + count)[0], (rhss + count)[1]);
+      // Set the new RHS
+      set_rhs(env_warm, rhss + count, m);
+
+      if ((termcode = sym_warm_solve(env_warm)) < 0){
+         printf("PROBLEM INFEASIBLE!\n");
+      }
+
+      sym_get_obj_val(env_warm, &warmObjVal);
+      printf("WARM OBJ : %.5f\n", warmObjVal);
+
+      sym_evaluate_dual_function(env_warm, rhss + count, m, &dualFuncObj);
+      // assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
+
+      count += m;
+
+   }
+
+   
 
    // -----------------------------------------------------
    // RHS Test 
@@ -100,19 +165,19 @@ int main(int argc, char **argv)
       printf("RHS %d\n", i);
 
       // Generate a random new rhs
-      generate_rand_array(m, 0, 2000, rhs);
+      generate_rand_array(m, 0, 5000, rhs);
       
       // Set the new RHS
-      set_rhs(env_cold, rhs, m);
+      set_rhs(env_warm, rhs, m);
 
-      sym_write_lp(env_cold, "peppe.lp");
+      sym_write_lp(env_warm, "peppe.lp");
 
       // Cold solve
-      if ((termcode = sym_solve(env_cold)) < 0){
+      if ((termcode = sym_warm_solve(env_warm)) < 0){
          printf("PROBLEM INFEASIBLE!\n");
       } 
 
-      sym_get_obj_val(env_cold, &coldObjVal);
+      sym_get_obj_val(env_warm, &coldObjVal);
       printf("OPT OBJ : %.7f\n", coldObjVal);
 
       printf("RHS: (%.2f, %.2f)\n", rhs[0], rhs[1]);
@@ -120,6 +185,13 @@ int main(int argc, char **argv)
       printf("DUAL FUNC: %.5f\n", dualFuncObj);
 
       assert(dualFuncObj - coldObjVal < 1e-5 || fabs(dualFuncObj - coldObjVal) < 1e-5);
+
+      if (!(fabs(dualFuncObj - coldObjVal) < 1e-5)){
+         sym_build_dual_func(env_warm);
+      }
+
+      sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
+      assert(fabs(dualFuncObj - coldObjVal) < 1e-5);
    
    }
    printf("ENDING\n");

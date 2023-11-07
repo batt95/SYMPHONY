@@ -599,7 +599,12 @@ int resolve_node(sym_environment *env, bc_node *node)
 			{
 				node->duals = (double *)malloc(lp_data->m * DSIZE);
 			}
+			if (!node->dj)
+			{
+				node->dj = (double *)malloc(lp_data->n * DSIZE);
+			}
 			memcpy(node->duals, lp_data->dualsol, lp_data->m * DSIZE);
+			memcpy(node->dj, lp_data->dj, lp_data->n * DSIZE);
 		}
 #endif
 	}
@@ -3778,6 +3783,16 @@ void print_dual_function(warm_start_desc *ws)
 	{
 		printDisjunction(ws->dual_func->disj[i]);
 	}
+
+	printf("==========================\n");
+	printf("BASIS\n");
+	printf("==========================\n");
+	for (dual_hash *s = ws->dual_func->hashtb; s != NULL; s = (dual_hash *)(s->hh.next)) {
+        for (int i = 0; i < s->len; i++){
+			printf("%d ", s->basis_idx[i]);
+		}
+		printf("\n");
+    }
 }
 
 /*===========================================================================*/
@@ -3785,42 +3800,6 @@ void print_dual_function(warm_start_desc *ws)
 /*----------------- Policy to save dual func from nodes ---------------------*/
 #define DUALS_SAVE_ALL 0
 #define DUALS_LEAF_ONLY 1
-
-// Custom hash function for a dual_solution object
-// We use this hash as a proxy of the real key
-// in the hashtable to make things easier
-int hash_dual(const dual_solution* dual) {
-    // int64_t hash = 17; 
-
-    // // Combine the hash values of idx and val arrays
-    // for (int i = 0; i < dual->nnz; i++) {
-    //     // Combine hash with idx value
-    //     hash = hash * 31 + (int64_t)(dual->idx[i]);
-        
-    //     // Combine hash with val value
-	// 	// Multiply by 1e6 to keep trace of decimals
-    //     hash = hash * 31 + (int64_t)(dual->val[i] * 1e6); 
-    // }
-
-    // return hash;
-
-	int hash = 37;
-    int int_hash;
-    // Iterate over the array of floats and update the hash
-    for (int i = 0; i < dual->nnz; i++) {
-        int_hash = 0;
-        // Convert the float to an integer representation
-        int_hash = int_hash * 73 + (dual->idx[i]);
-
-        // Combine hash with val value
-        int_hash = int_hash * 31 + (int)(dual->val[i] * 1000000);
-        // XOR the integer representation with the current hash
-        hash ^= int_hash;
-    }
-
-
-    return hash;
-}
 
 int compare_duals(const dual_solution* a, const dual_solution* b) {
 	double zerotol = 1e-7;
@@ -3866,6 +3845,8 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
 	return is_added;
 }
 
+int count = -1;
+
 int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				  branch_desc *bpath, int* curr_term, int* curr_piece,
 				  int *duals_index_row, int *duals_index_col, double *duals_val,
@@ -3883,6 +3864,8 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	int lbchange = 0, ubchange = 0; 
 	int level = node->bc_level, child_num = node->bobj.child_num;
 	double zerotol = 1e-9;
+
+	
 	
 	branch_obj *bobj;
 	dual_hash *dual;
@@ -3913,18 +3896,31 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	if (node->feasibility_status == ROOT_NODE ||
 		node->feasibility_status == FEASIBLE_PRUNED ||
 		node->feasibility_status == OVER_UB_PRUNED ||
-		node->feasibility_status == NODE_BRANCHED_ON){
-		// printf("NODE %d STATUS: %d\n", node->bc_index, node->feasibility_status);
+		node->feasibility_status == NODE_BRANCHED_ON ||
+		node->feasibility_status == INFEASIBLE_PRUNED
+		){
+		printf("NODE %d STATUS: %d\n", node->bc_index, node->feasibility_status);
 		// check the policy we want to save dual solutions from the tree
-		if (node->duals &&
+		if (node->duals && node->dj && 
 		((ws->dual_func->policy == DUALS_SAVE_ALL) ||
-			(ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
+		 (ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
 		{
-			// for (int i = 0; i < ws->m; i++){
-			// 	printf("%d : %.3f ", i, node->duals[i]);
-			// }
-			// printf("\n");
-			if (node->basis_idx && (node->basis_len > 0)){
+			printf("DUALS: \n");
+			for (int i = 0; i < node->basis_len; i++){
+				printf("%d ", node->basis_idx[i]);
+			}
+			printf(" | ");
+			for (int i = 0; i < ws->m; i++){
+				printf("%.5f ", node->duals[i]);
+			}
+			printf("\n");
+			if (node->feasibility_status == INFEASIBLE_PRUNED && node->rays){
+				dual = (dual_hash *)malloc(sizeof(dual_hash));
+				dual->basis_idx = (int *)malloc(ISIZE);
+				dual->basis_idx[0] = count--;
+				dual->len = 1;
+			}
+			else if (node->basis_idx && (node->basis_len > 0)){
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
@@ -3932,21 +3928,36 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			}
 			// try to add this dual into the hashtable
 			if (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)){
+				// printf("Added!\n");
 				// successfully added, collect reduced costs
 				int *num_piece = &(ws->dual_func->num_pieces);
 				// find nnzs and fill reduced costs related structures
-				for (i = 0; i < ws->m; i++)
-				{
-					(*max_poss_nnz)++;
-					if (fabs(node->duals[i]) >= zerotol)
+				// if (!node->rays){
+					for (i = 0; i < ws->m; i++)
 					{
-						duals_index_row[*nnz_duals] = *curr_piece;
-						duals_index_col[*nnz_duals] = i;
-						duals_val[*nnz_duals] = node->duals[i];
-						(*nnz_duals)++;
+						(*max_poss_nnz)++;
+						if (fabs(node->duals[i]) >= zerotol)
+						{
+							duals_index_row[*nnz_duals] = *curr_piece;
+							duals_index_col[*nnz_duals] = i;
+							duals_val[*nnz_duals] = node->duals[i];
+							(*nnz_duals)++;
+						}
 					}
-				}
-
+				// } else {
+				// 	for (i = 0; i < ws->m; i++)
+				// 	{
+				// 		node->duals[i] = node->duals[i] + 1000 * node->rays[i];
+				// 		(*max_poss_nnz)++;
+				// 		if (fabs(node->duals[i]) >= zerotol)
+				// 		{
+				// 			duals_index_row[*nnz_duals] = *curr_piece;
+				// 			duals_index_col[*nnz_duals] = i;
+				// 			duals_val[*nnz_duals] = node->duals[i];
+				// 			(*nnz_duals)++;
+				// 		}
+				// 	}
+				// }
 				for (i = 0; i < ws->n; i++)
 				{
 					(*max_poss_nnz)++;
@@ -3962,91 +3973,94 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				(ws->dual_func->num_pieces)++;
 
 			}
-
-			// If this is a child, we have a term of the disjunction
-			if (!child_num)
-			{
-				if (level > 0)
-				{
-					disj = (disjunction_desc *)malloc(sizeof(disjunction_desc));
-					double *lb = (double *)malloc(DSIZE * ws->n);
-					double *ub = (double *)malloc(DSIZE * ws->n);
-					memcpy(lb, mip->lb, DSIZE * ws->n);
-					memcpy(ub, mip->ub, DSIZE * ws->n);
-
-					for (int i = 0; i < level; i++){
-						varidx = bpath[i].name;
-						// printf("VARIABLE %d - TYPE %c - RHS %.2f\n", varidx, bpath[i].sense, bpath[i].rhs);
-						switch (bpath[i].sense)
-						{
-						case 'E':
-							lb[varidx] = bpath[i].rhs;
-							ub[varidx] = bpath[i].rhs;
-							break;
-						case 'L':
-							if (bpath[i].rhs < mip->ub[varidx])
-								ub[varidx] = bpath[i].rhs;
-							break;
-						case 'G':
-							if (bpath[i].rhs > mip->lb[varidx])
-								lb[varidx] = bpath[i].rhs;
-							break;
-						case 'R':
-							printf("Warning: Ranged constraints not handled!\n");
-							exit(1);
-							break;
-						}
-					}
-					// printf("-----------------\n");
-
-					// count how many lb/ub changed from the original mip
-					for (int i = 0; i < ws->n; i++){
-						if (lb[i] > mip->lb[i])
-							lbchange++;
-						if (ub[i] < mip->ub[i])
-							ubchange++;	
-					}
-
-					disj->lblen = lbchange;
-					disj->ublen = ubchange;
-					if (lbchange == 0){
-						disj->lbvaridx = NULL;
-						disj->lb = NULL;
-					} else {
-						disj->lbvaridx = (int *)malloc(sizeof(int) * lbchange);
-						disj->lb = (double *)malloc(sizeof(double) * lbchange);
-					}
-					if (ubchange == 0){
-						disj->ubvaridx = NULL;
-						disj->ub = NULL;
-					} else {
-						disj->ubvaridx = (int *)malloc(sizeof(int) * ubchange);
-						disj->ub = (double *)malloc(sizeof(double) * ubchange);
-					}
-					
-					// fill
-					l = k = 0;
-					for (int i = 0; i < ws->n; i++){
-						if (lb[i] > mip->lb[i]){
-							disj->lbvaridx[l] = i;
-							disj->lb[l] = lb[i];
-							l++;
-						}
-						if (ub[i] < mip->ub[i]){
-							disj->ubvaridx[k] = i;
-							disj->ub[k] = ub[i];
-							k++;
-						}
-					}
-
-					ws->dual_func->disj[*curr_term] = *disj;
-					(*curr_term)++;
-					FREE(lb);
-					FREE(ub);
-				}
-			} 
 		}
 	}
+
+	// If this is a child, we have a term of the disjunction
+	if (!child_num)
+	{
+		if (level > 0)
+		{
+			disj = (disjunction_desc *)malloc(sizeof(disjunction_desc));
+			double *lb = (double *)malloc(DSIZE * ws->n);
+			double *ub = (double *)malloc(DSIZE * ws->n);
+			memcpy(lb, mip->lb, DSIZE * ws->n);
+			memcpy(ub, mip->ub, DSIZE * ws->n);
+
+			for (int i = 0; i < level; i++){
+				varidx = bpath[i].name;
+				// printf("VARIABLE %d - TYPE %c - RHS %.2f\n", varidx, bpath[i].sense, bpath[i].rhs);
+				switch (bpath[i].sense)
+				{
+				case 'E':
+					lb[varidx] = bpath[i].rhs;
+					ub[varidx] = bpath[i].rhs;
+					break;
+				case 'L':
+					if (bpath[i].rhs < mip->ub[varidx])
+						ub[varidx] = bpath[i].rhs;
+					break;
+				case 'G':
+					if (bpath[i].rhs > mip->lb[varidx])
+						lb[varidx] = bpath[i].rhs;
+					break;
+				case 'R':
+					printf("Warning: Ranged constraints not handled!\n");
+					exit(1);
+					break;
+				}
+			}
+			// printf("-----------------\n");
+
+			// count how many lb/ub changed from the original mip
+			for (int i = 0; i < ws->n; i++){
+				if (lb[i] > mip->lb[i])
+					lbchange++;
+				if (ub[i] < mip->ub[i])
+					ubchange++;	
+			}
+
+			disj->lblen = lbchange;
+			disj->ublen = ubchange;
+			if (lbchange == 0){
+				disj->lbvaridx = NULL;
+				disj->lb = NULL;
+			} else {
+				disj->lbvaridx = (int *)malloc(sizeof(int) * lbchange);
+				disj->lb = (double *)malloc(sizeof(double) * lbchange);
+			}
+			if (ubchange == 0){
+				disj->ubvaridx = NULL;
+				disj->ub = NULL;
+			} else {
+				disj->ubvaridx = (int *)malloc(sizeof(int) * ubchange);
+				disj->ub = (double *)malloc(sizeof(double) * ubchange);
+			}
+			
+			// fill
+			l = k = 0;
+			for (int i = 0; i < ws->n; i++){
+				if (lb[i] > mip->lb[i]){
+					disj->lbvaridx[l] = i;
+					disj->lb[l] = lb[i];
+					l++;
+				}
+				if (ub[i] < mip->ub[i]){
+					disj->ubvaridx[k] = i;
+					disj->ub[k] = ub[i];
+					k++;
+				}
+			}
+
+			ws->dual_func->disj[*curr_term] = *disj;
+			printf("---- NODE %d DISJ ----\n", node->bc_index);
+			printDisjunction(*disj);
+			(*curr_term)++;
+			FREE(lb);
+			FREE(ub);
+		}
+	} 
+
 	// if child_num > 0, then do recursion on child nodes
 	for (j = 0; j < child_num; j++)
 		collect_duals(ws, node->children[j], mip, bpath, curr_term, curr_piece,
@@ -4190,6 +4204,11 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	double *rhs_times_pi = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
 	int *is_infty = (int *)calloc(ws->dual_func->num_pieces, ISIZE);
 	int *dj_start = (int *)malloc(ws->dual_func->num_pieces * ISIZE);
+
+	int *debug = (int *)calloc(ws->n, ISIZE);
+	double *dense = (double *)calloc(ws->n, DSIZE);
+	int debug_count = 0;
+	int found = 0;
 	
 	const double* elem = duals->getElements();
     const int* indices = duals->getIndices();
@@ -4257,14 +4276,20 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			l = 0; // lbvaridx pointer
 			while (j < last){
 				idx = indices[j] - ws->m;
+				while (u < disj->ublen && idx > disj->ubvaridx[u])
+				u++;
+
+				while (l < disj->lblen && idx > disj->lbvaridx[l])
+					l++;
 				if (elem[j] <= 0){
 					if (u < disj->ublen && disj->ubvaridx[u] == idx){
 						// printf("DISJ UB: %d : %.3f\n", disj->ubvaridx[u], disj->ub[u]);
 						// printf("RED Cost: %d : %.3f\n", j, elem[j]);
 						// printf("MIP UB: %.3f\n", mip->ub[disj->ubvaridx[u]]);
 						// printf("------------------\n");
+						debug[debug_count++] = -indices[j];
 						if (mip->ub[idx] < SYM_INFINITY){
-							// printf("%d : %.5f \n", idx, elem[j] * (disj->ub[u] - mip->ub[idx]));
+							printf("%d : %.5f \n", idx, elem[j] * (disj->ub[u] - mip->ub[idx]));
 							curr_piece_bound += elem[j] * (disj->ub[u] - mip->ub[idx]);
 						} else {
 							curr_piece_bound += elem[j] * disj->ub[u];
@@ -4279,8 +4304,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 						// printf("RED Cost: %d : %.3f\n", j, elem[j]);
 						// printf("MIP LB: %.3f\n", mip->lb[disj->lbvaridx[l]]);
 						// printf("------------------\n");
+						debug[debug_count++] = indices[j];
 						if (mip->lb[idx] > -SYM_INFINITY){
-							// printf("%d : %.5f \n", idx, elem[j] * (disj->lb[l] - mip->lb[idx]));
+							printf("%d : %.5f \n", idx, elem[j] * (disj->lb[l] - mip->lb[idx]));
 							curr_piece_bound += elem[j] * (disj->lb[l] - mip->lb[idx]);
 						} else {
 							// if (curr_is_infty) curr_is_infty--;
@@ -4301,6 +4327,40 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				if(u >= disj->ublen && l >= disj->lblen)
 					break; // while
 			}
+			printf("------------\n");
+			for (j = dj_start[i]; j < last; j++){
+				dense[indices[j] - ws->m] = elem[j];
+			}
+			printf("---DEBUG--- beg\n");
+
+			for (int i = 0; i < disj->ublen; i++){
+				if(dense[disj->ubvaridx[i]] < 0){
+					for (int j = 0; j < debug_count; j++){
+						if (debug[j] == -(disj->ubvaridx[i] + ws->m)) found = 1;
+					}
+					assert(found);
+					found = 0;
+				}
+			}
+
+			for (int i = 0; i < disj->lblen; i++){
+				if(dense[disj->lbvaridx[i]] > 0){
+					for (int j = 0; j < debug_count; j++){
+						if (debug[j] == (disj->lbvaridx[i] + ws->m)) found = 1;
+					}
+					assert(found);
+					found = 0;
+				}
+			}
+			printf("\n");
+			for (int i = 0; i < ws->n; i++){
+				debug[i] = 0;
+			}
+			for (int i = 0; i < ws->n; i++){
+				dense[i] = 0;
+			}
+			debug_count = 0;
+			printf("---DEBUG--- end\n");
 			if ((!curr_is_infty) &&
 				curr_piece_bound > local_best_bound){
 				local_best_bound = curr_piece_bound;
