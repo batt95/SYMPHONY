@@ -6912,6 +6912,29 @@ SYMPHONYLIB_EXPORT int sym_build_dual_func(sym_environment *env) {
    return build_dual_func(env->warm_start, env->mip);
 }
 
+SYMPHONYLIB_EXPORT int sym_read_tree_info(sym_environment *env) {
+   
+   int num_paths = get_num_leaf_nodes(env->warm_start->rootnode);
+
+   // Allocate memory for:
+   // - List of branching decisions taken from the root towards each leaf node
+   branch_desc **bpaths = (branch_desc **)malloc(sizeof(branch_desc *) * num_paths);
+   // - List of depth of each leaf node
+   int *leaf_depth = (int *)malloc(ISIZE * num_paths);
+   // - max_depth allocation for temporary bpath
+	branch_desc *bpath = (branch_desc *)malloc(env->warm_start->stat.max_depth * sizeof(branch_desc));
+
+   num_paths = 0;
+
+   printf("===========================\n");
+   printf("   BRANCH AND BOUND TREE   \n");
+   printf("===========================\n");
+
+   read_tree_info(env, env->warm_start->rootnode, bpaths, bpath, leaf_depth, &num_paths);
+
+   return 1;
+}
+
 SYMPHONYLIB_EXPORT int sym_evaluate_dual_function(sym_environment *env, 
                               double *new_rhs, int size_new_rhs, double *dual_bound) {
    return evaluate_dual_function(env->warm_start, env->mip, new_rhs, 

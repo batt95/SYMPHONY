@@ -3035,14 +3035,14 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
          lp_data->basis_len = len;
       }
 
-      for (int i = 0; i < lp_data->basis_len; i++){
-         printf("%d ", lp_data->basis_idx[i]);
-      }
-      printf(" | ");
-      for (int i = 0; i < lp_data->maxm; i++){
-         printf("%.5f ", lp_data->dualsol[i]);
-      }
-      printf("\n");
+      // for (int i = 0; i < lp_data->basis_len; i++){
+      //    printf("%d ", lp_data->basis_idx[i]);
+      // }
+      // printf(" | ");
+      // for (int i = 0; i < lp_data->maxm; i++){
+      //    printf("%.5f ", lp_data->dualsol[i]);
+      // }
+      // printf("\n");
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3226,14 +3226,14 @@ int dual_simplex(LPdata *lp_data, int *iterd)
          lp_data->basis_len = len;
       }
 
-      for (int i = 0; i < lp_data->basis_len; i++){
-         printf("%d ", lp_data->basis_idx[i]);
-      }
-      printf(" | ");
-      for (int i = 0; i < lp_data->maxm; i++){
-         printf("%.5f ", lp_data->dualsol[i]);
-      }
-      printf("\n");
+      // for (int i = 0; i < lp_data->basis_len; i++){
+      //    printf("%d ", lp_data->basis_idx[i]);
+      // }
+      // printf(" | ");
+      // for (int i = 0; i < lp_data->maxm; i++){
+      //    printf("%.5f ", lp_data->dualsol[i]);
+      // }
+      // printf("\n");
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }

@@ -183,11 +183,17 @@ void free_master PROTO((sym_environment *env));
 #endif
 
 // feb223
+int sym_read_tree_info PROTO((sym_environment * env));
+int read_tree_info PROTO((sym_environment *env, bc_node *node, 
+						 branch_desc **bpaths, branch_desc *bpath,
+						 int *leaf_depth, int *num_paths));
+
 void print_tree PROTO((bc_node *node));
 int sym_build_dual_func PROTO((sym_environment * env));
 int sym_print_dual_func PROTO((warm_start_desc * ws));
 void print_dual_function PROTO((warm_start_desc * ws));
 
+int get_num_leaf_nodes PROTO((bc_node *node));
 int build_dual_func PROTO((warm_start_desc *ws, MIPdesc *mip));
 int evaluate_dual_function PROTO((warm_start_desc *ws, MIPdesc *mip, 
 						double *new_rhs, int size_new_rhs, double *dual_bound));

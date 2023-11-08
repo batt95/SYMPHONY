@@ -3652,6 +3652,132 @@ void free_master(sym_environment *env)
 /*===========================================================================*/
 /*===========================================================================*/
 
+
+int read_tree_info(sym_environment *env, bc_node *node, 
+					branch_desc **bpaths, branch_desc *bpath,
+					int *leaf_depth, int *num_paths){
+	
+	if (node == NULL)
+	{
+		printf("Warning: NULL pointer\n");
+		return (FUNCTION_TERMINATED_ABNORMALLY);
+	}
+
+	int i, j;
+	int branchvaridx;
+	int level = node->bc_level, child_num = node->bobj.child_num;
+	branch_obj *bobj;
+
+	int n = env->mip->n;
+	int m = env->mip->m;
+
+	// if level>0, save the branching constraint
+	if (level > 0)
+	{
+		for (j = 0; j < node->parent->bobj.child_num; j++)
+			if (node->parent->children[j] == node)
+				break;
+
+		bobj = &(node->parent->bobj);
+		bpath[level - 1].type = bobj->type;
+		bpath[level - 1].name = bobj->name;
+		bpath[level - 1].sense = bobj->sense[j];
+		bpath[level - 1].rhs = bobj->rhs[j];
+		bpath[level - 1].range = bobj->range[j];
+		bpath[level - 1].branch = bobj->branch[j];
+	}
+
+	printf("NODE %d STATUS: %d\n", node->bc_index, node->feasibility_status);
+	// check feasibility status of this node
+	if (node->feasibility_status == ROOT_NODE ||
+		node->feasibility_status == FEASIBLE_PRUNED ||
+		node->feasibility_status == OVER_UB_PRUNED ||
+		node->feasibility_status == NODE_BRANCHED_ON
+		)
+	{
+
+		// Access dual multipliers (len = m)
+		if (node->duals){
+			printf(" - Duals: ");
+			for (int i = 0; i < m; i++){
+				printf("%.5f ", node->duals[i]);
+			}
+			printf("\n");
+		} else {
+			printf(" - NO DUALS! ");
+		}
+
+		// Access LP basis indices (sparse format, len = basis_len)
+		// if basis_idx[i] > n it means that the (basis_idx[i] - n)-th 
+		// slack variable is basic
+		if(node->basis_len){
+			printf(" - Basis: ");
+			for (int i = 0; i < node->basis_len; i++){
+				printf("%d ", i, node->basis_idx[i]);
+			}
+			printf("\n");
+		} else {
+			printf(" - NO BASIS! ");
+		}
+
+		printf("---------------------------\n");
+	}
+
+	// If this is a child, we have a term of the disjunction
+	if (!child_num)
+	{
+		if (level == 0)
+		{
+			assert(*num_paths == 0);
+			bpath = NULL;
+			bpaths[*num_paths] = NULL;
+		}
+		else
+		{	
+			printf("===========================\n");
+			// Here's the list of all branching decisions
+			// They must be aggregated to get arrays with all lb/ub
+			// Here's an example of how you can access these fields
+			printf("    DISJUNCTION TERM %d: \n", (*num_paths));
+			printf("===========================\n");
+			for (int i = 0; i < level; i++){
+				branchvaridx = bpath[i].name;
+				switch (bpath[i].sense)
+				{
+				case 'E':
+					printf(" - x[%d] = %.5f\n", branchvaridx, bpath[i].rhs);
+					break;
+
+				case 'G':
+					printf(" - x[%d] >= %.5f\n", branchvaridx, bpath[i].rhs);
+					break;
+				
+				case 'L':
+					printf(" - x[%d] <= %.5f\n", branchvaridx, bpath[i].rhs);
+					break;
+				
+				default:
+					printf("Something went wrong!\n");
+					exit(1);
+					break;
+				}
+			}
+
+			printf("===========================\n");
+
+			bpaths[*num_paths] = (branch_desc *)malloc(sizeof(branch_desc) * level);
+			memcpy(bpaths[*num_paths], bpath, sizeof(branch_desc) * level);
+			leaf_depth[*num_paths] = level;
+			(*num_paths)++;
+		}
+	}
+
+	// if child_num>0, then do recursion on child nodes
+	for (j = 0; j < child_num; j++)
+		read_tree_info(env, node->children[j], bpaths, bpath, leaf_depth, num_paths);
+}
+
+
 // feb223
 // Adapted from Suresh's code
 

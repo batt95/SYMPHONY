@@ -22,6 +22,7 @@ CYGPATH_W = @CYGPATH_W@
 
 EXAMPLES = milp milp2 bicriteria sensitivity \
 	warm_start1 warm_start2 warm_start3 rhs_obj_changes test_vf test_dual_func
+  example_aleks
 
 ##############################################################################
 # If you wish to use SYMPHONY through the SYMPHONY OSI interface, 
