@@ -6971,6 +6971,9 @@ SYMPHONYLIB_EXPORT int check_dual_solutions(MIPdesc *mip, dual_func_desc *df){
       else
          printf("DUAL %d NOT FEASIBLE!\n", i);
    }
+
+   FREE(rhs);
+   return 1;
 }
 
 /*===========================================================================*/

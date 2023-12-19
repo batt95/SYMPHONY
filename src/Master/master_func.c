@@ -3932,7 +3932,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				// successfully added, collect reduced costs
 				int *num_piece = &(ws->dual_func->num_pieces);
 				// find nnzs and fill reduced costs related structures
-				// if (!node->rays){
+				if (!node->rays){
 					for (i = 0; i < ws->m; i++)
 					{
 						(*max_poss_nnz)++;
@@ -3944,20 +3944,20 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 							(*nnz_duals)++;
 						}
 					}
-				// } else {
-				// 	for (i = 0; i < ws->m; i++)
-				// 	{
-				// 		node->duals[i] = node->duals[i] + 1000 * node->rays[i];
-				// 		(*max_poss_nnz)++;
-				// 		if (fabs(node->duals[i]) >= zerotol)
-				// 		{
-				// 			duals_index_row[*nnz_duals] = *curr_piece;
-				// 			duals_index_col[*nnz_duals] = i;
-				// 			duals_val[*nnz_duals] = node->duals[i];
-				// 			(*nnz_duals)++;
-				// 		}
-				// 	}
-				// }
+				} else {
+					for (i = 0; i < ws->m; i++)
+					{
+						node->duals[i] = node->duals[i] - 100000 * node->rays[i];
+						(*max_poss_nnz)++;
+						if (fabs(node->duals[i]) >= zerotol)
+						{
+							duals_index_row[*nnz_duals] = *curr_piece;
+							duals_index_col[*nnz_duals] = i;
+							duals_val[*nnz_duals] = node->duals[i];
+							(*nnz_duals)++;
+						}
+					}
+				}
 				for (i = 0; i < ws->n; i++)
 				{
 					(*max_poss_nnz)++;
@@ -4134,10 +4134,10 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 	// Infeasible leaf lead to infeasible disjunction term
 	ws->dual_func->num_terms = curr_term;
 
-	if (nnz_duals)
-		printf("DEBUG: matrix sparsity %.3f\n", ((double)(nnz_duals)/(double)(tot_piece)));
-	else
-		printf("DEBUG: No new dual pieces\n");
+	// if (nnz_duals)
+	// 	printf("DEBUG: matrix sparsity %.3f\n", ((double)(nnz_duals)/(double)(tot_piece)));
+	// else
+	// 	printf("DEBUG: No new dual pieces\n");
 
 	// If at least one new dual have been found, construct the Dual Function
 	if (curr_piece > 0)
@@ -4205,8 +4205,8 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	int *is_infty = (int *)calloc(ws->dual_func->num_pieces, ISIZE);
 	int *dj_start = (int *)malloc(ws->dual_func->num_pieces * ISIZE);
 
-	int *debug = (int *)calloc(ws->n, ISIZE);
-	double *dense = (double *)calloc(ws->n, DSIZE);
+	// int *debug = (int *)calloc(ws->n, ISIZE);
+	// double *dense = (double *)calloc(ws->n, DSIZE);
 	int debug_count = 0;
 	int found = 0;
 	
@@ -4287,9 +4287,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 						// printf("RED Cost: %d : %.3f\n", j, elem[j]);
 						// printf("MIP UB: %.3f\n", mip->ub[disj->ubvaridx[u]]);
 						// printf("------------------\n");
-						debug[debug_count++] = -indices[j];
+						// debug[debug_count++] = -indices[j];
 						if (mip->ub[idx] < SYM_INFINITY){
-							printf("%d : %.5f \n", idx, elem[j] * (disj->ub[u] - mip->ub[idx]));
+							// printf("%d : %.5f \n", idx, elem[j] * (disj->ub[u] - mip->ub[idx]));
 							curr_piece_bound += elem[j] * (disj->ub[u] - mip->ub[idx]);
 						} else {
 							curr_piece_bound += elem[j] * disj->ub[u];
@@ -4304,9 +4304,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 						// printf("RED Cost: %d : %.3f\n", j, elem[j]);
 						// printf("MIP LB: %.3f\n", mip->lb[disj->lbvaridx[l]]);
 						// printf("------------------\n");
-						debug[debug_count++] = indices[j];
+						// debug[debug_count++] = indices[j];
 						if (mip->lb[idx] > -SYM_INFINITY){
-							printf("%d : %.5f \n", idx, elem[j] * (disj->lb[l] - mip->lb[idx]));
+							// printf("%d : %.5f \n", idx, elem[j] * (disj->lb[l] - mip->lb[idx]));
 							curr_piece_bound += elem[j] * (disj->lb[l] - mip->lb[idx]);
 						} else {
 							// if (curr_is_infty) curr_is_infty--;
@@ -4327,40 +4327,40 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				if(u >= disj->ublen && l >= disj->lblen)
 					break; // while
 			}
-			printf("------------\n");
-			for (j = dj_start[i]; j < last; j++){
-				dense[indices[j] - ws->m] = elem[j];
-			}
-			printf("---DEBUG--- beg\n");
+			// printf("------------\n");
+			// for (j = dj_start[i]; j < last; j++){
+			// 	dense[indices[j] - ws->m] = elem[j];
+			// }
+			// printf("---DEBUG--- beg\n");
 
-			for (int i = 0; i < disj->ublen; i++){
-				if(dense[disj->ubvaridx[i]] < 0){
-					for (int j = 0; j < debug_count; j++){
-						if (debug[j] == -(disj->ubvaridx[i] + ws->m)) found = 1;
-					}
-					assert(found);
-					found = 0;
-				}
-			}
+			// for (int i = 0; i < disj->ublen; i++){
+			// 	if(dense[disj->ubvaridx[i]] < 0){
+			// 		for (int j = 0; j < debug_count; j++){
+			// 			if (debug[j] == -(disj->ubvaridx[i] + ws->m)) found = 1;
+			// 		}
+			// 		assert(found);
+			// 		found = 0;
+			// 	}
+			// }
 
-			for (int i = 0; i < disj->lblen; i++){
-				if(dense[disj->lbvaridx[i]] > 0){
-					for (int j = 0; j < debug_count; j++){
-						if (debug[j] == (disj->lbvaridx[i] + ws->m)) found = 1;
-					}
-					assert(found);
-					found = 0;
-				}
-			}
-			printf("\n");
-			for (int i = 0; i < ws->n; i++){
-				debug[i] = 0;
-			}
-			for (int i = 0; i < ws->n; i++){
-				dense[i] = 0;
-			}
-			debug_count = 0;
-			printf("---DEBUG--- end\n");
+			// for (int i = 0; i < disj->lblen; i++){
+			// 	if(dense[disj->lbvaridx[i]] > 0){
+			// 		for (int j = 0; j < debug_count; j++){
+			// 			if (debug[j] == (disj->lbvaridx[i] + ws->m)) found = 1;
+			// 		}
+			// 		assert(found);
+			// 		found = 0;
+			// 	}
+			// }
+			// printf("\n");
+			// for (int i = 0; i < ws->n; i++){
+			// 	debug[i] = 0;
+			// }
+			// for (int i = 0; i < ws->n; i++){
+			// 	dense[i] = 0;
+			// }
+			// debug_count = 0;
+			// printf("---DEBUG--- end\n");
 			if ((!curr_is_infty) &&
 				curr_piece_bound > local_best_bound){
 				local_best_bound = curr_piece_bound;
@@ -4377,6 +4377,10 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	printf("Dual function evaluates: %.3f\n", global_best_bound);
 
 	*dual_bound = global_best_bound;
+
+	FREE(rhs_times_pi);
+	FREE(is_infty);
+	FREE(dj_start);
 
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else

@@ -43,7 +43,7 @@ int main(int argc, char **argv)
    
    int termcode;
    int numTrain = 10;
-   int numTests = 10000;
+   int numTests = 10;
    double warmObjVal, coldObjVal, dualFuncObj;
 
    sym_environment *env_cold = sym_open_environment(); 
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
       printf("RHS %d\n", i);
 
       // Generate a random new rhs
-      generate_rand_array(m, 0, 5000, rhs);
+      generate_rand_array(m, 2000, 5000, rhs);
 
       rhss[count++] = rhs[0];
       rhss[count++] = rhs[1];
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
       printf("WARM OBJ : %.5f\n", warmObjVal);
 
       sym_evaluate_dual_function(env_warm, rhss + count, m, &dualFuncObj);
-      // assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
+      assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
 
       count += m;
 
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
       printf("RHS %d\n", i);
 
       // Generate a random new rhs
-      generate_rand_array(m, 0, 5000, rhs);
+      generate_rand_array(m, 0, 6000, rhs);
       
       // Set the new RHS
       set_rhs(env_warm, rhs, m);

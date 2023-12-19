@@ -3014,6 +3014,8 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       // Anahita
       if (term == LP_D_UNBOUNDED && lp_data->raysol)
       {
+         write_lp(lp_data, "unbounded_dual");
+         write_mps(lp_data, "unbounded_dual");
          get_dual_ray(lp_data);
          // feb223
          int len = 0;
@@ -3638,6 +3640,8 @@ void get_dj_pi(LPdata *lp_data)
    double *dj = lp_data->dj;
    int numberColumns = lp_data->n;
    int t;
+   // feb223
+   // lp_data->si->getModelPtr()->computeDuals(NULL);
    memcpy(lp_data->dualsol, lp_data->si->getRowPrice(), lp_data->m * DSIZE);
    pi = lp_data->dualsol;
    memcpy(dj, lp_data->si->getReducedCost(), lp_data->n * DSIZE);
@@ -3665,9 +3669,9 @@ void get_dj_pi(LPdata *lp_data)
 void get_dual_ray(LPdata *lp_data)
 {
    std::vector<double *> vRays;
-   // vRays = lp_data->si->getDualRays(1, true);
+   vRays = lp_data->si->getDualRays(1, true);
    
-   vRays = lp_data->si->getDualRays(1, false);
+   // vRays = lp_data->si->getDualRays(1, false);
 
    // check that there is at least one ray
    int raysReturned = static_cast<unsigned int>(vRays.size());
@@ -3689,13 +3693,75 @@ void get_dual_ray(LPdata *lp_data)
       }
       // temp: this assert would fail when cuts exist
       // assert(i < lp_data->m);
-      memcpy(lp_data->raysol, ray, lp_data->m * DSIZE);
+      memcpy(lp_data->raysol, ray, (lp_data->m + lp_data->n) * DSIZE);
    }
    else
    {
       double *ray = NULL;
    }
-   
+   if(lp_data->raysol){
+   // recompute dj's from scratch
+      // double scaleRay = 1/lp_data->raysol[0];
+      // for (int i = 0; i < lp_data->m + lp_data->n; i++){
+      //    lp_data->raysol[i] *= scaleRay;
+      // }
+      const double *pi;
+      const CoinPackedMatrix *matrix = lp_data->si->getMatrixByCol();
+      const int *row = matrix->getIndices();
+      const int *columnLength = matrix->getVectorLengths();
+      const CoinBigIndex *columnStart = matrix->getVectorStarts();
+      const double *elementByColumn = matrix->getElements();
+      const double *objective = lp_data->si->getObjCoefficients();
+      double *values = (double*)malloc(lp_data->n * DSIZE);
+      memcpy(lp_data->dualsol, lp_data->si->getRowPrice(), lp_data->m * DSIZE);
+      pi = lp_data->dualsol;
+
+      // Follow the ray's direction
+      for (int i = 0; i < lp_data->m; i++){
+         lp_data->dualsol[i] -= 100000*lp_data->raysol[i];
+      }
+
+      double *dj = lp_data->dj;
+      int numberColumns = lp_data->n;
+      int t;
+      double rayTimesA = 0.0;
+      for (t = 0; t < numberColumns; t++)
+      {
+         int k;
+         // double value = objective[t];
+         double value = 0;
+         for (k = columnStart[t]; k < columnStart[t] + columnLength[t]; k++)
+         {
+            int iRow = row[k];
+            value += elementByColumn[k] * lp_data->raysol[iRow];
+         }
+         values[t] = value;
+      }
+      
+      FREE(values);
+   // ------------
+   // Check dual ray proof of unboundedness b * raysol > 0
+   double lb = 0;
+   for (int i = 0; i < lp_data->m; i++)
+   {
+      if (lp_data->si->getRowUpper()[i] < 1000000)
+      {
+         lb += (lp_data->si->getRowUpper()[i]) * lp_data->raysol[i];
+      }
+      else
+      {
+         lb += lp_data->si->getRowLower()[i] * lp_data->raysol[i];
+      }
+   }
+   for (int i = 0; i < lp_data->n; i++){
+      if (lp_data->raysol[lp_data->m + i] < 0){
+         lb += lp_data->si->getColUpper()[i] * lp_data->raysol[lp_data->m + i];
+      } else {
+         lb += lp_data->si->getColLower()[i] * lp_data->raysol[lp_data->m + i];
+      }
+   }
+   assert(lb > -1e-5);
+   } 
 }
 
 /*===========================================================================*/
