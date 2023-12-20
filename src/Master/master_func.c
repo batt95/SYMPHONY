@@ -3896,31 +3896,32 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	if (node->feasibility_status == ROOT_NODE ||
 		node->feasibility_status == FEASIBLE_PRUNED ||
 		node->feasibility_status == OVER_UB_PRUNED ||
-		node->feasibility_status == NODE_BRANCHED_ON ||
-		node->feasibility_status == INFEASIBLE_PRUNED
+		node->feasibility_status == NODE_BRANCHED_ON 
+		// || node->feasibility_status == INFEASIBLE_PRUNED
 		){
-		printf("NODE %d STATUS: %d\n", node->bc_index, node->feasibility_status);
+		// printf("NODE %d STATUS: %d\n", node->bc_index, node->feasibility_status);
 		// check the policy we want to save dual solutions from the tree
 		if (node->duals && node->dj && 
 		((ws->dual_func->policy == DUALS_SAVE_ALL) ||
 		 (ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
 		{
-			printf("DUALS: \n");
-			for (int i = 0; i < node->basis_len; i++){
-				printf("%d ", node->basis_idx[i]);
-			}
-			printf(" | ");
-			for (int i = 0; i < ws->m; i++){
-				printf("%.5f ", node->duals[i]);
-			}
-			printf("\n");
-			if (node->feasibility_status == INFEASIBLE_PRUNED && node->rays){
-				dual = (dual_hash *)malloc(sizeof(dual_hash));
-				dual->basis_idx = (int *)malloc(ISIZE);
-				dual->basis_idx[0] = count--;
-				dual->len = 1;
-			}
-			else if (node->basis_idx && (node->basis_len > 0)){
+			// printf("DUALS: \n");
+			// for (int i = 0; i < node->basis_len; i++){
+				// printf("%d ", node->basis_idx[i]);
+			// }
+			// printf(" | ");
+			// for (int i = 0; i < ws->m; i++){
+				// printf("%.5f ", node->duals[i]);
+			// }
+			// printf("\n");
+			// if (node->feasibility_status == INFEASIBLE_PRUNED && node->rays){
+			// 	dual = (dual_hash *)malloc(sizeof(dual_hash));
+			// 	dual->basis_idx = (int *)malloc(ISIZE);
+			// 	dual->basis_idx[0] = count--;
+			// 	dual->len = 1;
+			// }
+			// else 
+			if (node->basis_idx && (node->basis_len > 0)){
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
@@ -4053,8 +4054,8 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			}
 
 			ws->dual_func->disj[*curr_term] = *disj;
-			printf("---- NODE %d DISJ ----\n", node->bc_index);
-			printDisjunction(*disj);
+			// printf("---- NODE %d DISJ ----\n", node->bc_index);
+			// printDisjunction(*disj);
 			(*curr_term)++;
 			FREE(lb);
 			FREE(ub);
@@ -4162,7 +4163,7 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 		}
 	}
 	FREE(bpath);
-	print_dual_function(ws);
+	// print_dual_function(ws);
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
 	printf("build_dual_func():\n");
