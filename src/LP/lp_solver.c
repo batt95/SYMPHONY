@@ -211,7 +211,9 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          lp_data->dualsol = (double *)malloc(lp_data->maxm * DSIZE);
          // Anahita
          FREE(lp_data->raysol);
-         lp_data->raysol = (double *)malloc(lp_data->maxm * DSIZE);
+         // lp_data->raysol = (double *)malloc(lp_data->maxm * DSIZE);
+         lp_data->raysol = (double *)malloc((lp_data->maxm + 
+                                             lp_data->maxn) * DSIZE);
          //
          FREE(lp_data->slacks);
          lp_data->slacks = (double *)malloc(lp_data->maxm * DSIZE);
@@ -225,8 +227,12 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          lp_data->dualsol = (double *)realloc((char *)lp_data->dualsol,
                                               lp_data->maxm * DSIZE);
          // Anahita
+         // lp_data->raysol = (double *)realloc((char *)lp_data->raysol,
+         //                                     lp_data->maxm * DSIZE);
          lp_data->raysol = (double *)realloc((char *)lp_data->raysol,
-                                             lp_data->maxm * DSIZE);
+                                             (lp_data->maxm + 
+                                             lp_data->maxn) * DSIZE);
+                                             
          //
          lp_data->slacks = (double *)realloc((void *)lp_data->slacks,
                                              lp_data->maxm * DSIZE);
@@ -3669,7 +3675,7 @@ void get_dj_pi(LPdata *lp_data)
 void get_dual_ray(LPdata *lp_data)
 {
    std::vector<double *> vRays;
-   vRays = lp_data->si->getDualRays(1, false);
+   vRays = lp_data->si->getDualRays(1, true);
    
    // vRays = lp_data->si->getDualRays(1, false);
 
@@ -3693,7 +3699,7 @@ void get_dual_ray(LPdata *lp_data)
       }
       // temp: this assert would fail when cuts exist
       // assert(i < lp_data->m);
-      memcpy(lp_data->raysol, ray, lp_data->m * DSIZE);
+      memcpy(lp_data->raysol, ray, lp_data->m + lp_data->n * DSIZE);
    }
    else
    {

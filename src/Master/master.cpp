@@ -1742,7 +1742,7 @@ SYMPHONYLIB_EXPORT int sym_warm_solve(sym_environment *env)
 
    int i, change_type;
    int node_limit, analyzed, depth, index, rated, level, level_rated;
-   cut_data **upd_cuts = NULL;
+   cut_data **upd_cuts;
    int loc, ws_cnum, cut_num = 0, *cut_ind = NULL, *tmp_ind = NULL;
    /* first check for the updates! */
    char *cru_vars = NULL; 

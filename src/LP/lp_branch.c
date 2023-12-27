@@ -1725,9 +1725,9 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 			get_dual_ray(lp_data);
 			if (lp_data->raysol){
 			   can->rays[j] =
-			      (double *) malloc(DSIZE*p->base.cutnum);
+			      (double *) malloc(DSIZE*(lp_data->n + lp_data->m));
 			   memcpy(can->rays[j], lp_data->raysol,
-				  DSIZE*p->base.cutnum);
+				  DSIZE*(lp_data->n + lp_data->m));
 			}
 		     }
 		  }
@@ -1858,9 +1858,9 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 			get_dual_ray(lp_data);
 			if (lp_data->raysol){
 			   can->rays[j] =
-			      (double *) malloc(DSIZE*p->base.cutnum);
+			      (double *) malloc(DSIZE*(lp_data->n + lp_data->m));
 			   memcpy(can->rays[j], lp_data->raysol,
-				  DSIZE*p->base.cutnum);
+				  DSIZE*(lp_data->n + lp_data->m));
 			}
 		     }
 		  }

@@ -583,7 +583,7 @@ void send_node_desc(lp_prob *p, int node_type)
 	    }
 	    n->rays = (double *) malloc (DSIZE * p->base.cutnum);
 	    if (lp_data->raysol){
-	       memcpy(n->rays, lp_data->raysol, DSIZE*p->base.cutnum);
+	       memcpy(n->rays, lp_data->raysol, DSIZE*(lp_data->n + lp_data->m));
 	    }
 	 }
       }
@@ -1075,7 +1075,7 @@ void send_node_desc(lp_prob *p, int node_type)
 	 if (lp_data->raysol){
 	    int have_ray = TRUE;
 	    send_int_array(&have_ray, 1);
-	    send_dbl_array(lp_data->raysol, p->base.cutnum);
+	    send_dbl_array(lp_data->raysol, lp_data->n + lp_data->m);
 	 }else{
 	    int have_ray = FALSE;
 	    send_int_array(&have_ray, 1);

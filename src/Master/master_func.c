@@ -4163,7 +4163,7 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 		}
 	}
 	FREE(bpath);
-	// print_dual_function(ws);
+	print_dual_function(ws);
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
 	printf("build_dual_func():\n");
@@ -4263,6 +4263,20 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	}
 
 	// printf("-----------------------\n");
+
+	if (ws->dual_func->num_terms == 0){
+		// The current b&b tree consists just of the root node
+		int is_bound_inf = 1;
+		local_best_bound = -SYM_INFINITY;
+		for (i = 0; i < ws->dual_func->num_pieces; i++){
+			if (!(is_infty[i]) && (rhs_times_pi[i] > local_best_bound)){
+				is_bound_inf = 0;
+				local_best_bound = rhs_times_pi[i];
+			}
+		}
+		global_best_bound = local_best_bound;
+		goto TERM_EVAL_DUAL_FUNC;
+	}
 	
 	// Now adjust the lb/ub * dj from the disjunction terms
 	for (int t = 0; t < ws->dual_func->num_terms; t++){
@@ -4374,10 +4388,11 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		}
 	}
 
-
-	printf("Dual function evaluates: %.3f\n", global_best_bound);
+TERM_EVAL_DUAL_FUNC:
 
 	*dual_bound = global_best_bound;
+
+	printf("Dual function evaluates: %.3f\n", *dual_bound);
 
 	FREE(rhs_times_pi);
 	FREE(is_infty);
