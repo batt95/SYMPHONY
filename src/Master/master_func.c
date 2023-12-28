@@ -4164,6 +4164,9 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 		}
 	}
 	FREE(bpath);
+	FREE(duals_index_row);
+	FREE(duals_index_col);
+	FREE(duals_val);
 	print_dual_function(ws);
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else

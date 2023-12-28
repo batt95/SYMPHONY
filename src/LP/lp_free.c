@@ -109,6 +109,18 @@ void free_candidate(branch_obj **cand)
 	 }
       }
 
+//feb223
+#ifndef MAX_CHILDREN_NUM
+      if (can->basis_idx){
+	 for (i = can->child_num-1; i >= 0; i--){
+#else
+      if (can->basis_idx){
+	 for (i = MAX_CHILDREN_NUM - 1; i >= 0; i--){
+#endif
+	    FREE(can->basis_idx[i]);
+	 }
+      }
+
 //Anahita
 #ifndef MAX_CHILDREN_NUM
       if (can->rays){
@@ -141,6 +153,8 @@ void free_candidate(branch_obj **cand)
       FREE(can->duals);
       FREE(can->rays); //Anahita
       FREE(can->dj); //Ted
+      FREE(can->basis_len); //feb223
+      FREE(can->basis_idx); //feb223
 #endif
       
       FREE(*cand);
@@ -307,6 +321,10 @@ void free_lp(lp_prob *p)
    }
    FREE(p->obj_history);
    if(p->frac_var_cnt) FREE(p->frac_var_cnt);
+
+#ifdef SENSITIVITY_ANALYSIS
+   FREE(p->basis_idx); // feb223
+#endif
 
    FREE(p);
 }

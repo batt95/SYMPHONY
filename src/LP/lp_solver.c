@@ -3688,6 +3688,8 @@ void get_dual_ray(LPdata *lp_data)
       double *ray = NULL;
    }
 
+   FREE(vRays);
+
    // if(lp_data->raysol){
    // // recompute dj's from scratch
    //    // double scaleRay = 1/lp_data->raysol[0];

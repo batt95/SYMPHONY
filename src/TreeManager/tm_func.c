@@ -3720,6 +3720,8 @@ void free_tree_node(bc_node *n)
    FREE(n->duals);
    //Ted
    FREE(n->dj);
+   // feb223
+   FREE(n->rays);
 #endif
    FREE(n->children);
 
