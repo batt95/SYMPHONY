@@ -501,9 +501,9 @@ int resolve_node(sym_environment *env, bc_node *node)
 		{
 			if (!node->rays)
 			{
-				node->rays = (double *)malloc(lp_data->m * DSIZE);
+				node->rays = (double *)malloc((lp_data->m + lp_data->n) * DSIZE);
 			}
-			memcpy(node->rays, lp_data->raysol, lp_data->m * DSIZE);
+			memcpy(node->rays, lp_data->raysol, (lp_data->m + lp_data->n) * DSIZE);
 		}
 #endif
 	}
@@ -1524,12 +1524,12 @@ int copy_node(warm_start_desc *ws, bc_node *n_to, bc_node *n_from)
 			   ws->rootnode->desc.uind.size * DSIZE);
 	}
 
-	if (n_from->rays)
-	{
-		n_to->rays = (double *)malloc(n_from->desc.uind.size * DSIZE);
-		memcpy(n_to->rays, n_from->rays,
-			   n_from->desc.uind.size * DSIZE);
-	}
+	// if (n_from->rays)
+	// {
+	// 	n_to->rays = (double *)malloc(n_from->desc.uind.size * DSIZE);
+	// 	memcpy(n_to->rays, n_from->rays,
+	// 		   n_from->desc.uind.size * DSIZE);
+	// }
 #endif
 
 #ifdef TRACE_PATH
@@ -3933,7 +3933,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				// successfully added, collect reduced costs
 				int *num_piece = &(ws->dual_func->num_pieces);
 				// find nnzs and fill reduced costs related structures
-				if (!node->rays){
+				// if (!node->rays){
 					for (i = 0; i < ws->m; i++)
 					{
 						(*max_poss_nnz)++;
@@ -3945,20 +3945,21 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 							(*nnz_duals)++;
 						}
 					}
-				} else {
-					for (i = 0; i < ws->m; i++)
-					{
-						node->duals[i] = node->duals[i] - 100000 * node->rays[i];
-						(*max_poss_nnz)++;
-						if (fabs(node->duals[i]) >= zerotol)
-						{
-							duals_index_row[*nnz_duals] = *curr_piece;
-							duals_index_col[*nnz_duals] = i;
-							duals_val[*nnz_duals] = node->duals[i];
-							(*nnz_duals)++;
-						}
-					}
-				}
+				// } 
+				// else {
+				// 	for (i = 0; i < ws->m; i++)
+				// 	{
+				// 		node->duals[i] = node->duals[i] - 100000 * node->rays[i];
+				// 		(*max_poss_nnz)++;
+				// 		if (fabs(node->duals[i]) >= zerotol)
+				// 		{
+				// 			duals_index_row[*nnz_duals] = *curr_piece;
+				// 			duals_index_col[*nnz_duals] = i;
+				// 			duals_val[*nnz_duals] = node->duals[i];
+				// 			(*nnz_duals)++;
+				// 		}
+				// 	}
+				// }
 				for (i = 0; i < ws->n; i++)
 				{
 					(*max_poss_nnz)++;

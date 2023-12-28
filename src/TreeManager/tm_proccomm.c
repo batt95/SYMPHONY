@@ -636,7 +636,6 @@ void receive_node_desc(tm_prob *tm, bc_node *n)
 	 FREE(n->dj); //Ted
       }
       receive_int_array(&n->sol_size, 1);
-      n->sol = (double *) malloc (DSIZE * n->sol_size);
       receive_dbl_array(n->sol, n->sol_size);
       if (tm->par.sensitivity_rhs){
 	 int have_ray;
@@ -645,8 +644,8 @@ void receive_node_desc(tm_prob *tm, bc_node *n)
 	 //Anahita
 	 receive_int_array(&have_ray, 1);
 	 if (have_ray){
-	    n->rays = (double *) malloc (DSIZE * tm->bcutnum); //Anahita
-	    receive_dbl_array(n->rays, tm->bcutnum);
+	    n->rays = (double *) malloc (DSIZE * (tm->bcutnum + n->sol_size)); //Anahita
+	    receive_dbl_array(n->rays, tm->bcutnum + n->sol_size);
 	 }
       }
       if (tm->par.sensitivity_bounds){

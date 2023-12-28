@@ -581,7 +581,7 @@ void send_node_desc(lp_prob *p, int node_type)
 	    if (n->rays){
 	       FREE(n->rays);
 	    }
-	    n->rays = (double *) malloc (DSIZE * p->base.cutnum);
+	    n->rays = (double *) malloc (DSIZE*(lp_data->n + lp_data->m));
 	    if (lp_data->raysol){
 	       memcpy(n->rays, lp_data->raysol, DSIZE*(lp_data->n + lp_data->m));
 	    }

@@ -2675,7 +2675,7 @@ void load_lp_prob(LPdata *lp_data, int scaling, int fastmip)
 {
 
    /* Turn off scaling for CLP */
-   // lp_data->si->setHintParam(OsiDoScale,false,OsiHintDo);
+   lp_data->si->setHintParam(OsiDoScale,false,OsiHintDo);
    MIPdesc *mip = lp_data->mip;
 
    lp_data->si->loadProblem(lp_data->n, lp_data->m,
@@ -3043,14 +3043,14 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
          lp_data->basis_len = len;
       }
 
-      // for (int i = 0; i < lp_data->basis_len; i++){
-      //    printf("%d ", lp_data->basis_idx[i]);
-      // }
-      // printf(" | ");
-      // for (int i = 0; i < lp_data->maxm; i++){
-      //    printf("%.5f ", lp_data->dualsol[i]);
-      // }
-      // printf("\n");
+      for (int i = 0; i < lp_data->basis_len; i++){
+         printf("%d ", lp_data->basis_idx[i]);
+      }
+      printf(" | ");
+      for (int i = 0; i < lp_data->maxm; i++){
+         printf("%.5f ", lp_data->dualsol[i]);
+      }
+      printf("\n");
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3234,14 +3234,14 @@ int dual_simplex(LPdata *lp_data, int *iterd)
          lp_data->basis_len = len;
       }
 
-      // for (int i = 0; i < lp_data->basis_len; i++){
-      //    printf("%d ", lp_data->basis_idx[i]);
-      // }
-      // printf(" | ");
-      // for (int i = 0; i < lp_data->maxm; i++){
-      //    printf("%.5f ", lp_data->dualsol[i]);
-      // }
-      // printf("\n");
+      for (int i = 0; i < lp_data->basis_len; i++){
+         printf("%d ", lp_data->basis_idx[i]);
+      }
+      printf(" | ");
+      for (int i = 0; i < lp_data->maxm; i++){
+         printf("%.5f ", lp_data->dualsol[i]);
+      }
+      printf("\n");
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3699,12 +3699,32 @@ void get_dual_ray(LPdata *lp_data)
       }
       // temp: this assert would fail when cuts exist
       // assert(i < lp_data->m);
-      memcpy(lp_data->raysol, ray, lp_data->m + lp_data->n * DSIZE);
+      memcpy(lp_data->raysol, ray, (lp_data->m + lp_data->n) * DSIZE);
+      
+      // Checking dual ray proof of unboundedness
+      double ray_times_b = 0.0;
+      const double *rhs = lp_data->si->getRightHandSide();
+      const double *lb  = lp_data->si->getColLower();
+      const double *ub  = lp_data->si->getColUpper();
+
+      for (int i = 0; i < lp_data->m; i++){
+         ray_times_b += ray[i]*rhs[i];
+      }
+
+      for (int i = lp_data->m; i < lp_data->m + lp_data->n; i++){
+         if (ray[i] > -1e-5)
+            ray_times_b += ray[i]*lb[i - lp_data->m];
+         else
+            ray_times_b += ray[i]*ub[i - lp_data->m];
+      }
+
+      assert(ray_times_b <= 1e-5);
    }
    else
    {
       double *ray = NULL;
    }
+
    // if(lp_data->raysol){
    // // recompute dj's from scratch
    //    // double scaleRay = 1/lp_data->raysol[0];
