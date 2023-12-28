@@ -3722,6 +3722,7 @@ void free_tree_node(bc_node *n)
    FREE(n->dj);
    // feb223
    FREE(n->rays);
+   FREE(n->basis_idx);
 #endif
    FREE(n->children);
 

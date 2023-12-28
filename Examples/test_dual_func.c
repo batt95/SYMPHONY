@@ -200,6 +200,7 @@ int main(int argc, char **argv)
    printf("ENDING\n");
 
    free(rhs);
+   free(rhss);
    sym_close_environment(env_warm);
    sym_close_environment(env_cold);
    return 0;
