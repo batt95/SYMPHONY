@@ -3682,7 +3682,7 @@ void get_dual_ray(LPdata *lp_data)
       }
 
       assert(ray_times_b <= 1e-5);
-      free(vRays);
+      FREE(vRays[0]);
    }
    else
    {
