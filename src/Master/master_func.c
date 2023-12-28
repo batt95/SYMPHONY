@@ -3629,6 +3629,14 @@ void free_master(sym_environment *env)
 			FREE(env->warm_start->dual_func->duals);
 			FREE(env->warm_start->dual_func->rays);
 			FREE(env->warm_start->dual_func->disj);
+
+			dual_hash *tmp, *curr;
+			HASH_ITER(hh, env->warm_start->dual_func->hashtb, curr, tmp) {
+				HASH_DEL(env->warm_start->dual_func->hashtb, curr);  
+				FREE(curr);             
+			}
+			FREE(env->warm_start->dual_func->hashtb);
+			FREE(env->warm_start->dual_func);
 		}
 #endif
 		FREE(env->warm_start);
