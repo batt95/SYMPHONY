@@ -3682,13 +3682,14 @@ void get_dual_ray(LPdata *lp_data)
       }
 
       assert(ray_times_b <= 1e-5);
+      free(vRays);
    }
    else
    {
       double *ray = NULL;
    }
 
-   FREE(vRays);
+   
 
    // if(lp_data->raysol){
    // // recompute dj's from scratch
