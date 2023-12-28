@@ -212,8 +212,7 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          // Anahita
          FREE(lp_data->raysol);
          // lp_data->raysol = (double *)malloc(lp_data->maxm * DSIZE);
-         lp_data->raysol = (double *)malloc((lp_data->maxm + 
-                                             lp_data->maxn) * DSIZE);
+         lp_data->raysol = (double *)malloc((lp_data->m + lp_data->n) * DSIZE);
          //
          FREE(lp_data->slacks);
          lp_data->slacks = (double *)malloc(lp_data->maxm * DSIZE);
@@ -230,8 +229,8 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          // lp_data->raysol = (double *)realloc((char *)lp_data->raysol,
          //                                     lp_data->maxm * DSIZE);
          lp_data->raysol = (double *)realloc((char *)lp_data->raysol,
-                                             (lp_data->maxm + 
-                                             lp_data->maxn) * DSIZE);
+                                             (lp_data->m + 
+                                             lp_data->n) * DSIZE);
                                              
          //
          lp_data->slacks = (double *)realloc((void *)lp_data->slacks,
