@@ -3624,6 +3624,13 @@ void free_master(sym_environment *env)
 		}
 
 		FREE(env->warm_start->cuts);
+#ifdef SENSITIVITY_ANALYSIS 
+		if(env->warm_start->dual_func){
+			FREE(env->warm_start->dual_func->duals);
+			FREE(env->warm_start->dual_func->rays);
+			FREE(env->warm_start->dual_func->disj);
+		}
+#endif
 		FREE(env->warm_start);
 	}
 #ifdef SYM_COMPILE_IN_CP
@@ -3837,6 +3844,7 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
     HASH_FIND(hh, *hashtb, toAdd->basis_idx, len, s);
     if (s == NULL){
         s = toAdd;
+		// TODO: FREE this
         HASH_ADD_KEYPTR(hh, *hashtb, s->basis_idx, len, s);
 		is_added = 1;
     } else {
@@ -3922,6 +3930,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			// }
 			// else 
 			if (node->basis_idx && (node->basis_len > 0)){
+				// TODO: FREE this
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
@@ -3983,6 +3992,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	{
 		if (level > 0)
 		{
+			// TODO: FREE this
 			disj = (disjunction_desc *)malloc(sizeof(disjunction_desc));
 			double *lb = (double *)malloc(DSIZE * ws->n);
 			double *ub = (double *)malloc(DSIZE * ws->n);
