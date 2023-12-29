@@ -954,6 +954,8 @@ typedef struct DUAL_FUNC_DESC{
    int                 num_pieces;
    // dual pieces and reduced costs
    CoinPackedMatrix   *duals;
+   // dual rays that proves infeasibility
+   CoinPackedMatrix   *rays;
    // disjunction description
    disjunction_desc   *disj;
    int                 num_terms;     // num of disjunction terms     
