@@ -3641,6 +3641,7 @@ void free_master(sym_environment *env)
 			dual_hash *tmp, *curr;
 			HASH_ITER(hh, env->warm_start->dual_func->hashtb, curr, tmp) {
 				HASH_DEL(env->warm_start->dual_func->hashtb, curr);  
+				FREE(curr->basis_idx);
 				FREE(curr);             
 			}
 			FREE(env->warm_start->dual_func->hashtb);
@@ -3955,7 +3956,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			}
 			// try to add this dual into the hashtable
 			if (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)){
-				FREE(dual);
 				// printf("Added!\n");
 				// successfully added, collect reduced costs
 				int *num_piece = &(ws->dual_func->num_pieces);
