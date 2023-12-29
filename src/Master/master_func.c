@@ -3630,10 +3630,10 @@ void free_master(sym_environment *env)
 			FREE(env->warm_start->dual_func->rays);
 
 			for(int j = env->warm_start->dual_func->num_terms; j > 0; j--){
-				FREE(env->warm_start->dual_func->disj->lbvaridx);
-				FREE(env->warm_start->dual_func->disj->lb);
-				FREE(env->warm_start->dual_func->disj->ubvaridx);
-				FREE(env->warm_start->dual_func->disj->ub);
+				FREE(env->warm_start->dual_func->disj[j].lbvaridx);
+				FREE(env->warm_start->dual_func->disj[j].lb);
+				FREE(env->warm_start->dual_func->disj[j].ubvaridx);
+				FREE(env->warm_start->dual_func->disj[j].ub);
 			}
 				
 			FREE(env->warm_start->dual_func->disj);
