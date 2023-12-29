@@ -3627,7 +3627,7 @@ void free_master(sym_environment *env)
 #ifdef SENSITIVITY_ANALYSIS 
 		if(env->warm_start->dual_func){
 			delete env->warm_start->dual_func->duals;
-			delete env->warm_start->dual_func->rays;
+			// delete env->warm_start->dual_func->rays;
 
 			for(int j = env->warm_start->dual_func->num_terms - 1; j > 0; --j){
 				FREE(env->warm_start->dual_func->disj[j].lbvaridx);
@@ -4177,8 +4177,7 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 	// If at least one new dual have been found, construct the Dual Function
 	if (curr_piece > 0)
 	{
-		CoinPackedMatrix *df;
-		df = new CoinPackedMatrix(false, duals_index_row,
+		CoinPackedMatrix *df = new CoinPackedMatrix(false, duals_index_row,
 									duals_index_col, duals_val, nnz_duals);
 
 		// Fix the number of columns to m + n
