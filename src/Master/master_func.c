@@ -3626,10 +3626,10 @@ void free_master(sym_environment *env)
 		FREE(env->warm_start->cuts);
 #ifdef SENSITIVITY_ANALYSIS 
 		if(env->warm_start->dual_func){
-			FREE(env->warm_start->dual_func->duals);
-			FREE(env->warm_start->dual_func->rays);
+			delete env->warm_start->dual_func->duals;
+			delete env->warm_start->dual_func->rays;
 
-			for(int j = env->warm_start->dual_func->num_terms; j > 0; j--){
+			for(int j = env->warm_start->dual_func->num_terms - 1; j > 0; --j){
 				FREE(env->warm_start->dual_func->disj[j].lbvaridx);
 				FREE(env->warm_start->dual_func->disj[j].lb);
 				FREE(env->warm_start->dual_func->disj[j].ubvaridx);
