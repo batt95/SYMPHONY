@@ -3629,7 +3629,7 @@ void free_master(sym_environment *env)
 			delete env->warm_start->dual_func->duals;
 			// delete env->warm_start->dual_func->rays;
 
-			for(int j = env->warm_start->dual_func->num_terms - 1; j > 0; --j){
+			for(int j = env->warm_start->dual_func->num_terms - 1; j >= 0; --j){
 				FREE(env->warm_start->dual_func->disj[j].lbvaridx);
 				FREE(env->warm_start->dual_func->disj[j].lb);
 				FREE(env->warm_start->dual_func->disj[j].ubvaridx);
@@ -3953,9 +3953,11 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
 				dual->len = node->basis_len;
+			} else {
+				dual = NULL;
 			}
 			// try to add this dual into the hashtable
-			if (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)){
+			if (dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual))){
 				// printf("Added!\n");
 				// successfully added, collect reduced costs
 				int *num_piece = &(ws->dual_func->num_pieces);
@@ -4001,6 +4003,13 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				(*curr_piece)++;
 				(ws->dual_func->num_pieces)++;
 
+			} else {
+				// This dual is a duplicate, we can FREE it
+				if (dual){
+					FREE(dual->basis_idx);
+					FREE(dual);
+				}
+				
 			}
 		}
 	}
