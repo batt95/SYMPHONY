@@ -127,6 +127,8 @@ int main(int argc, char **argv)
 
       sym_build_dual_func(env_warm);
 
+      return 0;
+
       // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
    }
 
