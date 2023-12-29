@@ -3628,6 +3628,14 @@ void free_master(sym_environment *env)
 		if(env->warm_start->dual_func){
 			FREE(env->warm_start->dual_func->duals);
 			FREE(env->warm_start->dual_func->rays);
+
+			for(int j = env->warm_start->dual_func->num_terms; j > 0; j--){
+				FREE(env->warm_start->dual_func->disj->lbvaridx);
+				FREE(env->warm_start->dual_func->disj->lb);
+				FREE(env->warm_start->dual_func->disj->ubvaridx);
+				FREE(env->warm_start->dual_func->disj->ub);
+			}
+				
 			FREE(env->warm_start->dual_func->disj);
 
 			dual_hash *tmp, *curr;
@@ -3858,6 +3866,7 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
     } else {
         is_added = 0;
     }
+	FREE(s);
 	return is_added;
 }
 
