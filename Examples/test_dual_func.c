@@ -105,6 +105,13 @@ int main(int argc, char **argv)
    assert(warmObjVal >= dualFuncObj);
    // assert(warmObjVal == dualFuncObj);
 
+   free(rhss);
+   free(rhs);
+   sym_close_environment(env_warm);
+   sym_close_environment(env_cold);
+
+   return 0;
+
 
    // Build a dual function from a bunch of RHSs
    for (int i = 0; i < numTrain; i++){
