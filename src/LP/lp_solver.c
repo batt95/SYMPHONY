@@ -2996,27 +2996,6 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       {
          get_slacks(lp_data);
 
-         // feb223
-         int len = 0;
-         int *cstat = (int *)malloc(ISIZE * lp_data->n);
-         int *rstat = (int *)malloc(ISIZE * lp_data->m);
-         get_basis(lp_data, cstat, rstat);
-         for (int i = 0; i < lp_data->n; i++){
-            if(cstat[i] == VAR_BASIC){
-               lp_data->basis_idx[len] = i;
-               len++;
-            }
-         }
-         for (int i = 0; i < lp_data->m; i++){
-            if(rstat[i] == VAR_BASIC){
-               lp_data->basis_idx[len] = lp_data->n + i;
-               len++;
-            }
-         }
-         lp_data->basis_len = len;
-
-         FREE(cstat);
-         FREE(rstat);
       }
 
       // Anahita
@@ -3024,8 +3003,30 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       {
          get_dual_ray(lp_data); 
          // lp_data->basis_idx = NULL; 
-         lp_data->basis_len = 0;
+         // lp_data->basis_len = 0;
       }
+
+      // feb223
+      int len = 0;
+      int *cstat = (int *)malloc(ISIZE * lp_data->n);
+      int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      get_basis(lp_data, cstat, rstat);
+      for (int i = 0; i < lp_data->n; i++){
+         if(cstat[i] == VAR_BASIC){
+            lp_data->basis_idx[len] = i;
+            len++;
+         }
+      }
+      for (int i = 0; i < lp_data->m; i++){
+         if(rstat[i] == VAR_BASIC){
+            lp_data->basis_idx[len] = lp_data->n + i;
+            len++;
+         }
+      }
+      lp_data->basis_len = len;
+
+      FREE(cstat);
+      FREE(rstat);
 
       // for (int i = 0; i < lp_data->basis_len; i++){
       //    printf("%d ", lp_data->basis_idx[i]);
@@ -3172,27 +3173,6 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       {
          get_slacks(lp_data);
 
-         // feb223
-         int len = 0;
-         int *cstat = (int *)malloc(ISIZE * lp_data->n);
-         int *rstat = (int *)malloc(ISIZE * lp_data->m);
-         get_basis(lp_data, cstat, rstat);
-         for (int i = 0; i < lp_data->n; i++){
-            if(cstat[i] == VAR_BASIC){
-               lp_data->basis_idx[len] = i;
-               len++;
-            }
-         }
-         for (int i = 0; i < lp_data->m; i++){
-            if(rstat[i] == VAR_BASIC){
-               lp_data->basis_idx[len] = lp_data->n + i;
-               len++;
-            }
-         }
-         lp_data->basis_len = len;
-
-         FREE(cstat);
-         FREE(rstat);
       }
 
       // Anahita
@@ -3200,8 +3180,30 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       {
          get_dual_ray(lp_data); 
          // lp_data->basis_idx = NULL; 
-         lp_data->basis_len = 0;
+         // lp_data->basis_len = 0;
       }
+
+      // feb223
+      int len = 0;
+      int *cstat = (int *)malloc(ISIZE * lp_data->n);
+      int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      get_basis(lp_data, cstat, rstat);
+      for (int i = 0; i < lp_data->n; i++){
+         if(cstat[i] == VAR_BASIC){
+            lp_data->basis_idx[len] = i;
+            len++;
+         }
+      }
+      for (int i = 0; i < lp_data->m; i++){
+         if(rstat[i] == VAR_BASIC){
+            lp_data->basis_idx[len] = lp_data->n + i;
+            len++;
+         }
+      }
+      lp_data->basis_len = len;
+
+      FREE(cstat);
+      FREE(rstat);
 
       // for (int i = 0; i < lp_data->basis_len; i++){
       //    printf("%d ", lp_data->basis_idx[i]);
@@ -3345,7 +3347,7 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
       {
          get_dual_ray(lp_data); 
          // lp_data->basis_idx = NULL; 
-         lp_data->basis_len = 0;
+         // lp_data->basis_len = 0;
       }
 
       // for (int i = 0; i < lp_data->basis_len; i++){

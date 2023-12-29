@@ -105,12 +105,12 @@ int main(int argc, char **argv)
    assert(warmObjVal >= dualFuncObj);
    // assert(warmObjVal == dualFuncObj);
 
-   free(rhss);
-   free(rhs);
-   sym_close_environment(env_warm);
-   sym_close_environment(env_cold);
+   // free(rhss);
+   // free(rhs);
+   // sym_close_environment(env_warm);
+   // sym_close_environment(env_cold);
 
-   return 0;
+   // return 0;
 
 
    // Build a dual function from a bunch of RHSs
@@ -133,8 +133,6 @@ int main(int argc, char **argv)
       }
 
       sym_build_dual_func(env_warm);
-
-      return 0;
 
       // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
    }

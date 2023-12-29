@@ -3563,6 +3563,18 @@ int trim_warm_tree(sym_environment *env, bc_node *n)
 
 /*===========================================================================*/
 
+void free_disjunction(dual_func_desc *dual_func){
+
+	for(int j = dual_func->num_terms - 1; j >= 0; --j){
+		FREE(dual_func->disj[j].lbvaridx);
+		FREE(dual_func->disj[j].lb);
+		FREE(dual_func->disj[j].ubvaridx);
+		FREE(dual_func->disj[j].ub);
+	}
+		
+	FREE(dual_func->disj);
+}
+
 void free_master(sym_environment *env)
 {
 	int i;
@@ -3626,17 +3638,13 @@ void free_master(sym_environment *env)
 		FREE(env->warm_start->cuts);
 #ifdef SENSITIVITY_ANALYSIS 
 		if(env->warm_start->dual_func){
-			delete env->warm_start->dual_func->duals;
-			// delete env->warm_start->dual_func->rays;
 
-			for(int j = env->warm_start->dual_func->num_terms - 1; j >= 0; --j){
-				FREE(env->warm_start->dual_func->disj[j].lbvaridx);
-				FREE(env->warm_start->dual_func->disj[j].lb);
-				FREE(env->warm_start->dual_func->disj[j].ubvaridx);
-				FREE(env->warm_start->dual_func->disj[j].ub);
-			}
-				
-			FREE(env->warm_start->dual_func->disj);
+			if (env->warm_start->dual_func->duals)
+				delete env->warm_start->dual_func->duals;
+			if (env->warm_start->dual_func->rays)
+				delete env->warm_start->dual_func->rays;
+
+			free_disjunction(env->warm_start->dual_func);
 
 			dual_hash *tmp, *curr;
 			HASH_ITER(hh, env->warm_start->dual_func->hashtb, curr, tmp) {
@@ -3890,8 +3898,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	int lbchange = 0, ubchange = 0; 
 	int level = node->bc_level, child_num = node->bobj.child_num;
 	double zerotol = 1e-9;
-
-	
 	
 	branch_obj *bobj;
 	dual_hash *dual;
@@ -3947,15 +3953,14 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			// 	dual->len = 1;
 			// }
 			// else 
+			dual = NULL;
 			if (node->basis_idx && (node->basis_len > 0)){
 				// TODO: FREE this
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
 				dual->len = node->basis_len;
-			} else {
-				dual = NULL;
-			}
+			} 
 			// try to add this dual into the hashtable
 			if (dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual))){
 				// printf("Added!\n");
@@ -4127,10 +4132,10 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 		ws->dual_func->hashtb = NULL;
 		ws->dual_func->duals  = NULL;
 		ws->dual_func->policy = DUALS_SAVE_ALL;
-		// ws->dual_func->policy = DUALS_LEAF_ONLY;
+		ws->dual_func->policy = DUALS_LEAF_ONLY;
 	} else {
 		// Delete the previous disjunction, there will be a new one
-		FREE(ws->dual_func->disj);
+		free_disjunction(ws->dual_func);
 	}
 
 	int num_leaf = get_num_leaf_nodes(ws->rootnode);
