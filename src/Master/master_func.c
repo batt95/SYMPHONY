@@ -3866,7 +3866,7 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
     } else {
         is_added = 0;
     }
-	FREE(s);
+	// FREE(s);
 	return is_added;
 }
 
@@ -3894,7 +3894,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	
 	branch_obj *bobj;
 	dual_hash *dual;
-	disjunction_desc *disj;
+	disjunction_desc disj;
 	
 	// if level>0, save the branching constraint
 	if (level > 0)
@@ -4010,7 +4010,9 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 		if (level > 0)
 		{
 			// TODO: FREE this
-			disj = (disjunction_desc *)malloc(sizeof(disjunction_desc));
+			// disj = (disjunction_desc *)malloc(sizeof(disjunction_desc));
+			disj.lb, disj.lbvaridx, disj.ub, disj.ubvaridx = NULL, NULL, NULL, NULL;
+			disj.lblen, disj.ublen = 0, 0;   
 			double *lb = (double *)malloc(DSIZE * ws->n);
 			double *ub = (double *)malloc(DSIZE * ws->n);
 			memcpy(lb, mip->lb, DSIZE * ws->n);
@@ -4049,39 +4051,42 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 					ubchange++;	
 			}
 
-			disj->lblen = lbchange;
-			disj->ublen = ubchange;
+			disj.lblen = lbchange;
+			disj.ublen = ubchange;
+			// Remove this
 			if (lbchange == 0){
-				disj->lbvaridx = NULL;
-				disj->lb = NULL;
+				disj.lbvaridx = NULL;
+				disj.lb = NULL;
+			// 
 			} else {
-				disj->lbvaridx = (int *)malloc(sizeof(int) * lbchange);
-				disj->lb = (double *)malloc(sizeof(double) * lbchange);
+				disj.lbvaridx = (int *)malloc(sizeof(int) * lbchange);
+				disj.lb = (double *)malloc(sizeof(double) * lbchange);
 			}
+			// Remove this
 			if (ubchange == 0){
-				disj->ubvaridx = NULL;
-				disj->ub = NULL;
+				disj.ubvaridx = NULL;
+				disj.ub = NULL;
 			} else {
-				disj->ubvaridx = (int *)malloc(sizeof(int) * ubchange);
-				disj->ub = (double *)malloc(sizeof(double) * ubchange);
+				disj.ubvaridx = (int *)malloc(sizeof(int) * ubchange);
+				disj.ub = (double *)malloc(sizeof(double) * ubchange);
 			}
 			
 			// fill
 			l = k = 0;
 			for (int i = 0; i < ws->n; i++){
 				if (lb[i] > mip->lb[i]){
-					disj->lbvaridx[l] = i;
-					disj->lb[l] = lb[i];
+					disj.lbvaridx[l] = i;
+					disj.lb[l] = lb[i];
 					l++;
 				}
 				if (ub[i] < mip->ub[i]){
-					disj->ubvaridx[k] = i;
-					disj->ub[k] = ub[i];
+					disj.ubvaridx[k] = i;
+					disj.ub[k] = ub[i];
 					k++;
 				}
 			}
 
-			ws->dual_func->disj[*curr_term] = *disj;
+			ws->dual_func->disj[*curr_term] = disj;
 			// printf("---- NODE %d DISJ ----\n", node->bc_index);
 			// printDisjunction(*disj);
 			(*curr_term)++;
