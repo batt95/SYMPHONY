@@ -3641,8 +3641,8 @@ void free_master(sym_environment *env)
 
 			if (env->warm_start->dual_func->duals)
 				delete env->warm_start->dual_func->duals;
-			if (env->warm_start->dual_func->rays)
-				delete env->warm_start->dual_func->rays;
+			// if (env->warm_start->dual_func->rays)
+			// 	delete env->warm_start->dual_func->rays;
 
 			free_disjunction(env->warm_start->dual_func);
 
@@ -3803,7 +3803,7 @@ void print_dual_function(warm_start_desc *ws)
     	const CoinBigIndex last = duals->getVectorLast(i);
     	for (CoinBigIndex j = duals->getVectorFirst(i); j < last; ++j){
 			// printf("%d, %d - %d \n", j, last, indices[j]);
-        	printf("%d : %.3f ", indices[j] < ws->m ? indices[j] : indices[j] /*- ws->m*/, elem[j]);
+        	printf("%d : %.10f, ", indices[j] < ws->m ? indices[j] : indices[j] /*- ws->m*/, elem[j]);
 		}
 		printf("\n------------------------\n");
     }
@@ -3955,7 +3955,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			// else 
 			dual = NULL;
 			if (node->basis_idx && (node->basis_len > 0)){
-				// TODO: FREE this
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
@@ -4022,10 +4021,9 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	// If this is a child, we have a term of the disjunction
 	if (!child_num)
 	{
+		printf("Fesibility status of this leaf: %d\n", node->feasibility_status);
 		if (level > 0)
 		{
-			// TODO: FREE this
-			// disj = (disjunction_desc *)malloc(sizeof(disjunction_desc));
 			disj.lb, disj.lbvaridx, disj.ub, disj.ubvaridx = NULL, NULL, NULL, NULL;
 			disj.lblen, disj.ublen = 0, 0;   
 			double *lb = (double *)malloc(DSIZE * ws->n);
@@ -4132,7 +4130,7 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 		ws->dual_func->hashtb = NULL;
 		ws->dual_func->duals  = NULL;
 		ws->dual_func->policy = DUALS_SAVE_ALL;
-		ws->dual_func->policy = DUALS_LEAF_ONLY;
+		// ws->dual_func->policy = DUALS_LEAF_ONLY;
 	} else {
 		// Delete the previous disjunction, there will be a new one
 		free_disjunction(ws->dual_func);
@@ -4329,7 +4327,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	}
 	
 	// Now adjust the lb/ub * dj from the disjunction terms
-	for (int t = 0; t < ws->dual_func->num_terms; t++){
+	for (int t = 0; t < ws->dual_func->num_terms - 1; t++){
 		disj = ws->dual_func->disj + t;
 		local_best_bound = -SYM_INFINITY;
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
