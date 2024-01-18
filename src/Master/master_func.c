@@ -4241,7 +4241,6 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 
 	// New rhs must be of the correct size
 	assert(size_new_rhs == ws->m);
-	printf("HERE 1\n");
 	int i, u, l, idx, curr_is_infty;
 	CoinPackedMatrix *duals = ws->dual_func->duals;
 	disjunction_desc *disj;
@@ -4263,7 +4262,6 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	
 	const double* elem = duals->getElements();
     const int* indices = duals->getIndices();
-	printf("HERE 2\n");
 	// Start by computing rhs * pi 
 	for (i = 0; i < ws->dual_func->num_pieces; i++){
 		first = duals->getVectorFirst(i);
@@ -4284,7 +4282,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			dj_start[i] = -1;
 		}
 	}
-	printf("HERE 3\n");
+	
 	// Now add the lb/ub * dj from the original MIP
 	for (i = 0; i < ws->dual_func->num_pieces; i++){
 		last = duals->getVectorLast(i);
@@ -4313,7 +4311,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		}
 		// printf("\n--------------\n");
 	}
-	printf("HERE 4\n");
+	
 	// printf("-----------------------\n");
 
 	if (ws->dual_func->num_terms == 0){
@@ -4329,7 +4327,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		global_best_bound = local_best_bound;
 		goto TERM_EVAL_DUAL_FUNC;
 	}
-	printf("HERE 5\n");
+	
 	// Now adjust the lb/ub * dj from the disjunction terms
 	for (int t = 0; t < ws->dual_func->num_terms - 1; t++){
 		disj = ws->dual_func->disj + t;
@@ -4439,7 +4437,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			global_best_bound = local_best_bound;
 		}
 	}
-	printf("HERE 6\n");
+	
 TERM_EVAL_DUAL_FUNC:
 
 	*dual_bound = global_best_bound;
