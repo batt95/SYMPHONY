@@ -4021,7 +4021,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	// If this is a child, we have a term of the disjunction
 	if (!child_num)
 	{
-		printf("Fesibility status of this leaf: %d\n", node->feasibility_status);
+		// printf("Fesibility status of this leaf: %d\n", node->feasibility_status);
 		if (level > 0)
 		{
 			disj.lb, disj.lbvaridx, disj.ub, disj.ubvaridx = NULL, NULL, NULL, NULL;
@@ -4211,7 +4211,7 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 	FREE(duals_index_row);
 	FREE(duals_index_col);
 	FREE(duals_val);
-	print_dual_function(ws);
+	// print_dual_function(ws);
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
 	printf("build_dual_func():\n");
