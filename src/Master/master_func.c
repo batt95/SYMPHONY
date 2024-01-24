@@ -4442,7 +4442,7 @@ TERM_EVAL_DUAL_FUNC:
 
 	*dual_bound = global_best_bound;
 
-	printf("Dual function evaluates: %.3f\n", *dual_bound);
+	// printf("Dual function evaluates: %.3f\n", *dual_bound);
 
 	FREE(rhs_times_pi);
 	FREE(is_infty);
