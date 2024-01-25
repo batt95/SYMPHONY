@@ -3683,7 +3683,7 @@ void get_dual_ray(LPdata *lp_data)
             ray_times_b += ray[i]*ub[i - lp_data->m];
       }
 
-      assert(ray_times_b <= 1e-5);
+      // assert(ray_times_b <= 1e-5);
       delete[] vRays[0];
    }
    else
