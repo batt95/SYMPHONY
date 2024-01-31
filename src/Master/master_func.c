@@ -1779,6 +1779,7 @@ int write_node(bc_node *node, FILE *f)
 	fprintf(f, " NODE_LEVEL      : %i\n", node->bc_level);
 	fprintf(f, " LOWER_BOUND     : %.4f\n", node->lower_bound);
 	fprintf(f, " NODE_STATUS     : %i\n", (int)node->node_status);
+	fprintf(f, " FEAS_STATUS     : %i\n", (int)node->feasibility_status);
 	fprintf(f, " NODE_LP         : %i\n", node->lp);
 	fprintf(f, " NODE_CG         : %i\n", node->cg);
 	fprintf(f, " NODE_CP         : %i\n", node->cp);
@@ -1924,6 +1925,37 @@ int write_node(bc_node *node, FILE *f)
 	}
 
 	fprintf(f, "\n");
+
+// #ifdef SENSITIVITY_ANALYSIS
+// 	fprintf(f, "================================\n");
+// 	fprintf(f, " DUALS    : ");
+// 	if (node->duals){
+// 		for (int i = 0; i < 1; i++){
+// 			fprintf(f, "%.3f ", node->duals[i]);
+// 		}
+// 		fprintf(f, "\n");
+// 	}
+// 	if (node->dj){
+// 		fprintf(f, " DJs    : ");
+// 		for (int i = 0; i < 4; i++){
+// 			fprintf(f, "%.3f ", node->dj[i]);
+// 		}
+// 		fprintf(f, "\n");
+// 	}
+// 	if (node->rays){
+// 		fprintf(f, " RAY    : ");
+// 		for (int i = 0; i < 4 + 1; i++){
+// 			fprintf(f, "%.3f ", node->rays[i]);
+// 		}
+// 		fprintf(f, "\n");
+// 	}
+// 	fprintf(f, " BASE INDEX    : ");
+// 	for (int i = 0; i < node->basis_len; i++){
+// 		fprintf(f, "%d ", node->basis_idx[i]);
+// 	}
+// 	fprintf(f, "\n");
+// 	fprintf(f, "================================\n");
+// #endif
 
 	return (FUNCTION_TERMINATED_NORMALLY);
 }
@@ -3641,9 +3673,15 @@ void free_master(sym_environment *env)
 
 			if (env->warm_start->dual_func->duals)
 				delete env->warm_start->dual_func->duals;
-			// if (env->warm_start->dual_func->rays)
-			// 	delete env->warm_start->dual_func->rays;
 
+
+			if (env->warm_start->dual_func->rays){
+				for (i = 0; i < env->warm_start->dual_func->num_rays; i++){
+					FREE(env->warm_start->dual_func->rays[i]);
+				}
+				FREE(env->warm_start->dual_func->rays);
+			}
+				
 			free_disjunction(env->warm_start->dual_func);
 
 			dual_hash *tmp, *curr;
@@ -3685,51 +3723,8 @@ void free_master(sym_environment *env)
 /*===========================================================================*/
 
 // feb223
-// Adapted from Suresh's code
 
-int dual_is_duplicate(warm_start_desc *ws, bc_node *node, 
-					  int *duals_index_row, int *duals_index_col, 
-					  double *duals_val, int nnz_duals, int num_pieces)
-{
-	if (node == NULL) return 1;
-	double zerotol = 1e-7;
-	int i, j = 0;
-	int is_duplicate = 0;
-
-	// Check in the current dual pieces
-	for (int curr = 0; (curr < num_pieces) && (!is_duplicate); curr++){
-		while(duals_index_row[j] < curr) j++;
-		for (i = 0; i < ws->m; i++){
-			if (fabs(node->duals[i]) >= zerotol){
-				if (duals_index_col[j] != i){
-					break;
-				} 
-				if (fabs(node->duals[i] - duals_val[j]) >= zerotol){
-					break;
-				} 
-				// duals[i] == vals[j] && i == cols[j]
-				// Everything is ok at the moment
-				j++;
-				if (j >= nnz_duals || duals_index_row[j] != curr){
-					is_duplicate = 1;
-					break;
-				}
-			} else {
-				// duals[i] is 0
-				if (duals_index_col[j] == i){
-					// curr element at j is not 0
-					break;
-				} 
-			}
-		}
-	}
-
-	// Check in the current CoinPackedMatrix
-	return is_duplicate;
-
-}
-
-int get_num_leaf_nodes(bc_node *node)
+int get_num_leaf_nodes(bc_node *node, int *num_rays)
 {
 	if (node == NULL)
 	{
@@ -3737,14 +3732,23 @@ int get_num_leaf_nodes(bc_node *node)
 	}
 	else if (!node->bobj.child_num)
 	{
+		// Count how many rays are there
+		if (node->rays){
+			(*num_rays)++;
+		}
 		return 1;
 	}
 	else
 	{
 		int num_leaf_subtrees = 0;
+
+		if (node->rays){
+			(*num_rays)++;
+		}
+
 		for (int i = 0; i < node->bobj.child_num; i++)
 		{
-			num_leaf_subtrees += get_num_leaf_nodes(node->children[i]);
+			num_leaf_subtrees += get_num_leaf_nodes(node->children[i], num_rays);
 		}
 		return num_leaf_subtrees;
 	}
@@ -3833,30 +3837,6 @@ void print_dual_function(warm_start_desc *ws)
 #define DUALS_SAVE_ALL 0
 #define DUALS_LEAF_ONLY 1
 
-int compare_duals(const dual_solution* a, const dual_solution* b) {
-	double zerotol = 1e-7;
-	if (a == b){
-		// They point at the same object
-		return 0;
-	}
-
-    if (a->nnz != b->nnz) {
-        // Number of non-zero elements is different
-        return 1;
-    }
-
-    for (int i = 0; i < a->nnz; i++) {
-        // Compare each element in idx and val arrays
-        if (a->idx[i] != b->idx[i] || fabs(a->val[i] - b->val[i]) > zerotol) {
-            // If any index or value is different, they are not equal
-            return 1;
-        }
-    }
-
-    // They are equal
-    return 0;
-}
-
 int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
     dual_hash *s;
 	int is_added = 0;
@@ -3879,10 +3859,10 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
 	return is_added;
 }
 
-int count = -1;
+// int count_leaf = 0;
 
 int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
-				  branch_desc *bpath, int* curr_term, int* curr_piece,
+				  branch_desc *bpath, int* curr_term, int* curr_piece, int* curr_ray, double** rays,
 				  int *duals_index_row, int *duals_index_col, double *duals_val,
 				  int *nnz_duals, int *max_poss_nnz){
 
@@ -3891,6 +3871,8 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 		printf("Warning: NULL pointer in get_leaf_node_data()\n");
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
+
+	// if (!node->parent) count_leaf = 0;
 
 	int i, j, k, l;
 	int is_added = 0;
@@ -3929,70 +3911,35 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 		node->feasibility_status == FEASIBLE_PRUNED ||
 		node->feasibility_status == OVER_UB_PRUNED ||
 		node->feasibility_status == NODE_BRANCHED_ON 
-		// || node->feasibility_status == INFEASIBLE_PRUNED
 		){
-		// printf("NODE %d STATUS: %d\n", node->bc_index, node->feasibility_status);
-		// check the policy we want to save dual solutions from the tree
 		if (node->duals && node->dj && 
 		((ws->dual_func->policy == DUALS_SAVE_ALL) ||
 		 (ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
 		{
-			// printf("DUALS: \n");
-			// for (int i = 0; i < node->basis_len; i++){
-				// printf("%d ", node->basis_idx[i]);
-			// }
-			// printf(" | ");
-			// for (int i = 0; i < ws->m; i++){
-				// printf("%.5f ", node->duals[i]);
-			// }
-			// printf("\n");
-			// if (node->feasibility_status == INFEASIBLE_PRUNED && node->rays){
-			// 	dual = (dual_hash *)malloc(sizeof(dual_hash));
-			// 	dual->basis_idx = (int *)malloc(ISIZE);
-			// 	dual->basis_idx[0] = count--;
-			// 	dual->len = 1;
-			// }
-			// else 
 			dual = NULL;
-			if (node->basis_idx && (node->basis_len > 0)){
+			if (node->basis_idx && (node->basis_len > 0) && node->basis_len == mip->m){
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
 				dual->len = node->basis_len;
 			} 
 			// try to add this dual into the hashtable
-			if (dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual))){
-				// printf("Added!\n");
+			if ((dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)))){
 				// successfully added, collect reduced costs
 				int *num_piece = &(ws->dual_func->num_pieces);
 				// find nnzs and fill reduced costs related structures
-				// if (!node->rays){
-					for (i = 0; i < ws->m; i++)
+				for (i = 0; i < ws->m; i++)
+				{
+					(*max_poss_nnz)++;
+					if (fabs(node->duals[i]) >= zerotol)
 					{
-						(*max_poss_nnz)++;
-						if (fabs(node->duals[i]) >= zerotol)
-						{
-							duals_index_row[*nnz_duals] = *curr_piece;
-							duals_index_col[*nnz_duals] = i;
-							duals_val[*nnz_duals] = node->duals[i];
-							(*nnz_duals)++;
-						}
+						duals_index_row[*nnz_duals] = *curr_piece;
+						duals_index_col[*nnz_duals] = i;
+						duals_val[*nnz_duals] = node->duals[i];
+						(*nnz_duals)++;
 					}
-				// } 
-				// else {
-				// 	for (i = 0; i < ws->m; i++)
-				// 	{
-				// 		node->duals[i] = node->duals[i] - 100000 * node->rays[i];
-				// 		(*max_poss_nnz)++;
-				// 		if (fabs(node->duals[i]) >= zerotol)
-				// 		{
-				// 			duals_index_row[*nnz_duals] = *curr_piece;
-				// 			duals_index_col[*nnz_duals] = i;
-				// 			duals_val[*nnz_duals] = node->duals[i];
-				// 			(*nnz_duals)++;
-				// 		}
-				// 	}
-				// }
+				}
+				
 				for (i = 0; i < ws->n; i++)
 				{
 					(*max_poss_nnz)++;
@@ -4005,7 +3952,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 					}
 				}
 				(*curr_piece)++;
-				(ws->dual_func->num_pieces)++;
+				// (ws->dual_func->num_pieces)++;
 
 			} else {
 				// This dual is a duplicate, we can FREE it
@@ -4018,10 +3965,60 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 		}
 	}
 
+	// Must collect the ray
+	if (node->rays){
+
+		bool is_duplicate = false;
+		bool is_all_zero = true;
+		// Check that the ray is not all zeros
+		for (i = 0; i < ws->m + ws->n; i++)
+		{
+			if (fabs(node->rays[i]) > 1e-5){
+				is_all_zero = false;
+				break;
+			}
+		}
+
+		if (!is_all_zero){
+			// Check duplicates among current rays
+			for (int i = 0; i < (*curr_ray) && (!is_duplicate); i++){
+				for (int j = 0; j < ws->m + ws->n; j++){
+					if (fabs(node->rays[j] - rays[i][j]) > 1e-7){
+						// These rays are different, no need to check more
+						break;
+					}
+					if (j == ws->m + ws->n - 1)
+						// We already have this ray
+						is_duplicate = true;
+				}
+			}
+
+			// Check duplicates among rays in dual_func_desc
+			for (int i = 0; i < ws->dual_func->num_rays && (!is_duplicate); i++){
+				for (int j = 0; j < ws->m + ws->n; j++){
+					if (fabs(node->rays[j] - ws->dual_func->rays[i][j]) > 1e-7){
+						// These rays are different, no need to check more
+						break;
+					}
+					if (j == ws->m + ws->n - 1)
+						// We already have this ray
+						is_duplicate = true;
+				}
+			}
+
+			if (!is_duplicate){
+				// Allocate space for curr ray
+				rays[*curr_ray] = (double *)malloc(DSIZE * (ws->m + ws->n));
+				memcpy(rays[*curr_ray], node->rays, DSIZE * (ws->m + ws->n));
+				(*curr_ray)++;
+			}
+		}
+	}
+
 	// If this is a child, we have a term of the disjunction
 	if (!child_num)
 	{
-		// printf("Fesibility status of this leaf: %d\n", node->feasibility_status);
+		// printf(" - %d Fesibility status of this leaf: %d\n", count_leaf++, node->feasibility_status);
 		if (level > 0)
 		{
 			disj.lb, disj.lbvaridx, disj.ub, disj.ubvaridx = NULL, NULL, NULL, NULL;
@@ -4033,7 +4030,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 
 			for (int i = 0; i < level; i++){
 				varidx = bpath[i].name;
-				// printf("VARIABLE %d - TYPE %c - RHS %.2f\n", varidx, bpath[i].sense, bpath[i].rhs);
 				switch (bpath[i].sense)
 				{
 				case 'E':
@@ -4054,7 +4050,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 					break;
 				}
 			}
-			// printf("-----------------\n");
 
 			// count how many lb/ub changed from the original mip
 			for (int i = 0; i < ws->n; i++){
@@ -4100,8 +4095,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			}
 
 			ws->dual_func->disj[*curr_term] = disj;
-			// printf("---- NODE %d DISJ ----\n", node->bc_index);
-			// printDisjunction(*disj);
 			(*curr_term)++;
 			FREE(lb);
 			FREE(ub);
@@ -4110,34 +4103,49 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 
 	// if child_num > 0, then do recursion on child nodes
 	for (j = 0; j < child_num; j++)
-		collect_duals(ws, node->children[j], mip, bpath, curr_term, curr_piece,
+		collect_duals(ws, node->children[j], mip, bpath, curr_term, curr_piece, curr_ray, rays,
 					  duals_index_row, duals_index_col, duals_val, nnz_duals, max_poss_nnz);
 }
 
-int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
+int build_dual_func(sym_environment *env)
 {
 
 #ifdef SENSITIVITY_ANALYSIS
-	if (!ws)
+
+	warm_start_desc *ws = env->warm_start;
+	MIPdesc *mip = env->mip;
+	ws->m = mip->m;
+	ws->n = mip->n;
+
+	if (!ws || !env)
 	{
 		printf("Warning: NULL pointer in build_dual_func()\n");
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
+
+	int num_rays = 0;
+	int num_leaf = get_num_leaf_nodes(ws->rootnode, &num_rays);
 
 	if (!ws->dual_func)
 	{
 		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
 		ws->dual_func->hashtb = NULL;
 		ws->dual_func->duals  = NULL;
+		ws->dual_func->num_pieces = 0;
 		ws->dual_func->policy = DUALS_SAVE_ALL;
 		// ws->dual_func->policy = DUALS_LEAF_ONLY;
+		ws->dual_func->granularity = env->par.tm_par.granularity;
+		ws->dual_func->rays = NULL;
+		ws->dual_func->num_rays = 0;
+		ws->dual_func->disj = NULL;
+		ws->dual_func->num_terms = 0;
 	} else {
 		// Delete the previous disjunction, there will be a new one
 		free_disjunction(ws->dual_func);
 	}
-
-	int num_leaf = get_num_leaf_nodes(ws->rootnode);
+	
 	ws->dual_func->num_terms = num_leaf;
+	// ws->dual_func->num_rays = num_rays;
 
 	// Allocate the space for the expected number of duals
 	// based on the policy
@@ -4160,6 +4168,9 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 	// Allocate memory for disjunction
 	ws->dual_func->disj = (disjunction_desc*)malloc(sizeof(disjunction_desc) * num_leaf);
 
+	// Allocate memory for rays to be collected
+	double **rays = (double**)malloc(sizeof(double*) * num_rays);
+
 	// Duals and reduced costs
 	int nnz_duals = 0;
 	int *duals_index_row = (int *)malloc(ISIZE * num_pieces * (ws->m + ws->n));
@@ -4172,9 +4183,10 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 
 	int curr_term = 0;  // current disjunction term
 	int curr_piece = 0; // current dual piece
+	int curr_ray = 0;   // current ray
 	int tot_piece = 0; // DEBUG: to check how sparse it is
 
-	collect_duals(ws, ws->rootnode, mip, bpath, &curr_term, &curr_piece,
+	collect_duals(ws, ws->rootnode, mip, bpath, &curr_term, &curr_piece, &curr_ray, rays,
 				 duals_index_row, duals_index_col, duals_val, &nnz_duals, &tot_piece);
 
 	// Update the actual number of disjunction terms
@@ -4207,12 +4219,45 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 			ws->dual_func->duals->bottomAppendPackedMatrix(*df);
 		}
 
+		// There should be a limit on the number of dual solutions we can collect
 		ws->dual_func->num_pieces = ws->dual_func->duals->getMajorDim();
 	}
+
+	if (curr_ray > 0){
+		// Allocate space for new rays
+		ws->dual_func->rays = (double **)realloc(ws->dual_func->rays, 
+								sizeof(double*) * (ws->dual_func->num_rays + curr_ray));
+		
+		if (ws->dual_func->rays == NULL){
+			printf("build_dual_func():\n");
+			printf("realloc() error.\n");
+		} else {
+
+			// Move new rays into dual_func_desc
+			for (int i = 0; i < curr_ray; i++){
+				ws->dual_func->rays[ws->dual_func->num_rays + i] = rays[i];
+			}
+
+			ws->dual_func->num_rays += curr_ray;
+		}
+	}
+
+	FREE(rays);
 	FREE(bpath);
 	FREE(duals_index_row);
 	FREE(duals_index_col);
 	FREE(duals_val);
+
+	// printf("==========================\n");
+	// printf("RAYS\n");
+	// printf("==========================\n");
+	// for (int i = 0; i < ws->dual_func->num_rays; i++){
+	// 	for (int j = 0; j < ws->m + ws->n; j++){
+	// 		printf("%.10f ", ws->dual_func->rays[i][j]);
+	// 	}
+	// 	printf("\n------------------------\n");
+	// }
+
 	// print_dual_function(ws);
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
@@ -4225,8 +4270,9 @@ int build_dual_func(warm_start_desc *ws, MIPdesc *mip)
 }
 
 int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip, 
-						double *new_rhs, int size_new_rhs, double *dual_bound){
-	#ifdef SENSITIVITY_ANALYSIS
+						double *new_rhs, int size_new_rhs, 
+						double *dual_bound){
+#ifdef SENSITIVITY_ANALYSIS
 	if (!ws)
 	{
 		printf("Warning: NULL pointer in evaluate_dual_func()\n");
@@ -4238,42 +4284,51 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		printf("Warning: None or empty dual function in evaluate_dual_func()\n");
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
+#if 1
+	// For sanity check
+	double sanity_objVal = 0;
+	OsiXSolverInterface *si = new OsiXSolverInterface();
+#endif
 
-	// New rhs must be of the correct size
-	assert(size_new_rhs == ws->m);
+	// Build the new rhs to be of the correct size, ws->m
+	double *rhs = (double *)malloc(ws->m * sizeof(double));
+	memcpy(rhs, new_rhs, size_new_rhs * sizeof(double));
+	if (size_new_rhs < ws->m){
+		for (int i = size_new_rhs; i < ws->m; i++){
+			rhs[i] = mip->rhs[i];
+		}
+	}
+
 	int i, u, l, idx, curr_is_infty;
 	CoinPackedMatrix *duals = ws->dual_func->duals;
 	disjunction_desc *disj;
 	CoinBigIndex first = 0, last = 0, j = 0;
 
 	double zerotol = 1e-9;
+	double granularity = ws->dual_func->granularity;
 	double curr_piece_bound;
 	double global_best_bound = SYM_INFINITY;
 	double local_best_bound;
+	double ray_times_b = 0;
+	int    is_ray_infty = 0;
 	// Allocate space for rhs * pi (i.e. dual solution)
 	double *rhs_times_pi = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
 	int *is_infty = (int *)calloc(ws->dual_func->num_pieces, ISIZE);
 	int *dj_start = (int *)malloc(ws->dual_func->num_pieces * ISIZE);
-
-	// int *debug = (int *)calloc(ws->n, ISIZE);
-	// double *dense = (double *)calloc(ws->n, DSIZE);
-	int debug_count = 0;
-	int found = 0;
+	bool *is_term_feas;
+	double *ray;
+	double *lb = (double *)malloc(ws->n * sizeof(double));
+	double *ub = (double *)malloc(ws->n * sizeof(double)); 
 	
 	const double* elem = duals->getElements();
     const int* indices = duals->getIndices();
 	// Start by computing rhs * pi 
 	for (i = 0; i < ws->dual_func->num_pieces; i++){
 		first = duals->getVectorFirst(i);
-		// printf("HERE 2  -  1\n");
 		last = duals->getVectorLast(i);
-		// printf("HERE 2  -  2\n");
-		// printf("NUM PIECE : %d\n", i);
 		for (j = first; j < last && indices[j] < ws->m; ++j){
-			// printf("%d : %.5f, %.5f | ", indices[j], elem[j], new_rhs[indices[j]]);
-			rhs_times_pi[i] += elem[j] * new_rhs[indices[j]];
+			rhs_times_pi[i] += elem[j] * rhs[indices[j]];
 		}
-		// printf("\n--------------\n");
 		// the last value of j is where the djs starts for the curr dual piece
 		if (j < last){
 			dj_start[i] = j;	
@@ -4286,14 +4341,12 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	// Now add the lb/ub * dj from the original MIP
 	for (i = 0; i < ws->dual_func->num_pieces; i++){
 		last = duals->getVectorLast(i);
-		// printf("NUM PIECE : %d\n", i);
 		for (j = dj_start[i]; j < last; j++)
 		{
 			idx = indices[j] - ws->m;
 			if (elem[j] >= zerotol) // dj >= 0 ?
 			{
 				if (mip->lb[idx] > -SYM_INFINITY){
-					// printf("%d : %.5f, %.5f | ", idx, elem[j], mip->lb[idx]);
 					rhs_times_pi[i] += elem[j] * mip->lb[idx];
 				} else {
 					is_infty[i]--;
@@ -4302,17 +4355,13 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			else
 			{
 				if (mip->ub[idx] < SYM_INFINITY){
-					// printf("%d : %.5f, %.5f | ", idx, elem[j], mip->ub[idx]);
 					rhs_times_pi[i] += elem[j] * mip->ub[idx];
 				} else {
 					is_infty[i]--;	
 				}
 			}
 		}
-		// printf("\n--------------\n");
 	}
-	
-	// printf("-----------------------\n");
 
 	if (ws->dual_func->num_terms == 0){
 		// The current b&b tree consists just of the root node
@@ -4327,11 +4376,161 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		global_best_bound = local_best_bound;
 		goto TERM_EVAL_DUAL_FUNC;
 	}
+
+	// =========== feb223 ====================================
+	// Use the dual rays in the Dual Function description to check
+	// if they yield a Farkas proof of primal infeasibility 
+	// for some term of the disjunction.
+	// 
+	// Given the LP:
+	// min 		cx
+	// s.t.		Ax <= b,
+	//		l <= x <= u,			
+	// and let r be a dual ray, then the Farkas proof goes as
+	// 
+	// 				rAz - rb > 0, where
+	// 
+	// z[j]  =	l[j], if rA[j] > 0,
+	// 	     =	u[j], if rA[j] < 0 
+	// yield the minimum violation.
+	// 
+	// CLP returns by default (r, -rA) but r is for the scaled 
+	// LP it is internally solving and it may not prove infeasibility
+	// for the unscaled problem. This has already taken care
+	// of in get_dual_ray().
+	// =========================================================
+
+	is_term_feas = (bool *)malloc(ws->dual_func->num_terms * sizeof(bool));
+	CoinFillN(is_term_feas, ws->dual_func->num_terms, true);
+	
+	if (ws->dual_func->num_rays > 0){
+		for (int t = 0; t < ws->dual_func->num_terms; t++){
+
+			memcpy(lb, mip->lb, ws->n * sizeof(double));
+			memcpy(ub, mip->ub, ws->n * sizeof(double));
+			disj = ws->dual_func->disj + t;
+
+			for (int i = 0; i < disj->lblen; i++){
+				idx = disj->lbvaridx[i];
+				lb[idx] = disj->lb[i];
+			}
+
+			for (int i = 0; i < disj->ublen; i++){
+				idx = disj->ubvaridx[i];
+				ub[idx] = disj->ub[i];
+			}
+
+			for (int r = 0; (r < ws->dual_func->num_rays) && (is_term_feas[t]); r++){
+				ray_times_b = 0;
+				ray = ws->dual_func->rays[r];
+				for (int i = 0; i < ws->m; i++){
+					ray_times_b -= ray[i] * rhs[i];
+				}
+
+				for (int i = ws->m; i < ws->m + ws->n; i++){
+					if (ray[i] > zerotol){
+						ray_times_b += ray[i] * lb[i - ws->m];
+					} 
+					else if (ray[i] < -zerotol){
+						ray_times_b += ray[i] * ub[i - ws->m];
+					}
+				}
+
+				if (ray_times_b > zerotol){
+					// This term of the disjunction is infeasible for this rhs
+					// and should not be considered
+					is_term_feas[t] = false;
+				}
+			}
+		}
+	}
+
+#if 1
+	// This is a sanity check if the rays prove primal infeasibility
+	si->setHintParam(OsiDoReducePrint);
+    si->messageHandler()->setLogLevel(0);
+	/* Turn off scaling for CLP */
+    si->setHintParam(OsiDoScale,false,OsiHintDo);
+
+	if (ws->dual_func->num_rays > 0){
+		for (int t = 0; t < ws->dual_func->num_terms; t++){
+
+			memcpy(lb, mip->lb, ws->n * sizeof(double));
+			memcpy(ub, mip->ub, ws->n * sizeof(double));
+			disj = ws->dual_func->disj + t;
+
+			for (int i = 0; i < disj->lblen; i++){
+				idx = disj->lbvaridx[i];
+				lb[idx] = disj->lb[i];
+			}
+
+			for (int i = 0; i < disj->ublen; i++){
+				idx = disj->ubvaridx[i];
+				ub[idx] = disj->ub[i];
+			}
+		
+			si->loadProblem(ws->n, ws->m,
+								mip->matbeg, mip->matind,
+								mip->matval, lb,
+								ub, mip->obj,
+								mip->sense, rhs,
+								mip->rngval);
+			
+			si->initialSolve();
+
+			if (si->isProvenPrimalInfeasible()){
+				if (is_term_feas[t])
+					si->writeLp("proof_not_working", "lp");
+				assert(!is_term_feas[t]);
+			} else {
+				if (!is_term_feas[t])
+					si->writeLp("proof_not_working", "lp");
+				assert(is_term_feas[t]);
+			}
+		}
+	}
+
+#endif
 	
 	// Now adjust the lb/ub * dj from the disjunction terms
-	for (int t = 0; t < ws->dual_func->num_terms - 1; t++){
+	for (int t = 0; t < ws->dual_func->num_terms; t++){
+		
+		if (!is_term_feas[t])
+			continue;
+
 		disj = ws->dual_func->disj + t;
 		local_best_bound = -SYM_INFINITY;
+
+		// Sanity check on dual optimal value
+		memcpy(lb, mip->lb, ws->n * sizeof(double));
+		memcpy(ub, mip->ub, ws->n * sizeof(double));
+		disj = ws->dual_func->disj + t;
+
+		for (int i = 0; i < disj->lblen; i++){
+			idx = disj->lbvaridx[i];
+			lb[idx] = disj->lb[i];
+		}
+
+		for (int i = 0; i < disj->ublen; i++){
+			idx = disj->ubvaridx[i];
+			ub[idx] = disj->ub[i];
+		}
+#if 1	
+		si->loadProblem(ws->n, ws->m,
+							mip->matbeg, mip->matind,
+							mip->matval, lb,
+							ub, mip->obj,
+							mip->sense, rhs,
+							mip->rngval);
+		
+		si->initialSolve();
+		if (si->isProvenOptimal()){
+			sanity_objVal = si->getObjValue();
+		} else {
+			// Should never happen!
+			assert(false);
+		}
+#endif
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
 			curr_piece_bound = rhs_times_pi[i];
 			curr_is_infty = is_infty[i];
@@ -4348,33 +4547,19 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 					l++;
 				if (elem[j] <= 0){
 					if (u < disj->ublen && disj->ubvaridx[u] == idx){
-						// printf("DISJ UB: %d : %.3f\n", disj->ubvaridx[u], disj->ub[u]);
-						// printf("RED Cost: %d : %.3f\n", j, elem[j]);
-						// printf("MIP UB: %.3f\n", mip->ub[disj->ubvaridx[u]]);
-						// printf("------------------\n");
-						// debug[debug_count++] = -indices[j];
 						if (mip->ub[idx] < SYM_INFINITY){
-							// printf("%d : %.5f \n", idx, elem[j] * (disj->ub[u] - mip->ub[idx]));
 							curr_piece_bound += elem[j] * (disj->ub[u] - mip->ub[idx]);
 						} else {
 							curr_piece_bound += elem[j] * disj->ub[u];
-							// if (curr_is_infty) curr_is_infty++;
 							curr_is_infty++;
 						}
 						u++;
 					}
 				} else {
 					if (l < disj->lblen && disj->lbvaridx[l] == idx){
-						// printf("DISJ LB: %d : %.3f\n", disj->lbvaridx[l], disj->lb[l]);
-						// printf("RED Cost: %d : %.3f\n", j, elem[j]);
-						// printf("MIP LB: %.3f\n", mip->lb[disj->lbvaridx[l]]);
-						// printf("------------------\n");
-						// debug[debug_count++] = indices[j];
 						if (mip->lb[idx] > -SYM_INFINITY){
-							// printf("%d : %.5f \n", idx, elem[j] * (disj->lb[l] - mip->lb[idx]));
 							curr_piece_bound += elem[j] * (disj->lb[l] - mip->lb[idx]);
 						} else {
-							// if (curr_is_infty) curr_is_infty--;
 							curr_piece_bound += elem[j] * disj->lb[l];
 							curr_is_infty--;
 						}
@@ -4392,40 +4577,6 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				if(u >= disj->ublen && l >= disj->lblen)
 					break; // while
 			}
-			// printf("------------\n");
-			// for (j = dj_start[i]; j < last; j++){
-			// 	dense[indices[j] - ws->m] = elem[j];
-			// }
-			// printf("---DEBUG--- beg\n");
-
-			// for (int i = 0; i < disj->ublen; i++){
-			// 	if(dense[disj->ubvaridx[i]] < 0){
-			// 		for (int j = 0; j < debug_count; j++){
-			// 			if (debug[j] == -(disj->ubvaridx[i] + ws->m)) found = 1;
-			// 		}
-			// 		assert(found);
-			// 		found = 0;
-			// 	}
-			// }
-
-			// for (int i = 0; i < disj->lblen; i++){
-			// 	if(dense[disj->lbvaridx[i]] > 0){
-			// 		for (int j = 0; j < debug_count; j++){
-			// 			if (debug[j] == (disj->lbvaridx[i] + ws->m)) found = 1;
-			// 		}
-			// 		assert(found);
-			// 		found = 0;
-			// 	}
-			// }
-			// printf("\n");
-			// for (int i = 0; i < ws->n; i++){
-			// 	debug[i] = 0;
-			// }
-			// for (int i = 0; i < ws->n; i++){
-			// 	dense[i] = 0;
-			// }
-			// debug_count = 0;
-			// printf("---DEBUG--- end\n");
 			if ((!curr_is_infty) &&
 				curr_piece_bound > local_best_bound){
 				local_best_bound = curr_piece_bound;
@@ -4433,7 +4584,14 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				local_best_bound = SYM_INFINITY;
 			}
 		}
-		if (local_best_bound < global_best_bound){
+
+#if 0
+		// This assertion may fail since CLP might have stopped
+		// the solution of LPs prematurely due to the curr UB in the Tree
+		// but this is not a problem
+		assert(fabs(local_best_bound - sanity_objVal) <= 0.1);
+#endif	
+		if (local_best_bound < global_best_bound - granularity){
 			global_best_bound = local_best_bound;
 		}
 	}
@@ -4442,11 +4600,16 @@ TERM_EVAL_DUAL_FUNC:
 
 	*dual_bound = global_best_bound;
 
-	// printf("Dual function evaluates: %.3f\n", *dual_bound);
-
 	FREE(rhs_times_pi);
 	FREE(is_infty);
 	FREE(dj_start);
+	FREE(lb);
+	FREE(ub);
+	FREE(rhs);
+
+#if 1 
+	delete si;
+#endif
 
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
@@ -4457,209 +4620,3 @@ TERM_EVAL_DUAL_FUNC:
 
 #endif
 }
-
-// int collect_dual_func(warm_start_desc *ws, bc_node *node,
-// 					  branch_desc *bpath, branch_desc **bpaths,
-// 					  int *leaf_depth, int *num_paths, int *num_piece,
-// 					  int *duals_index_row, int *duals_index_col, double *duals_val, int *nnz_duals,
-// 					  int *djs_index_row, int *djs_index_col, double *djs_val, int *nnz_djs)
-// {
-
-// 	if (node == NULL)
-// 	{
-// 		printf("Warning: NULL pointer in get_leaf_node_data()\n");
-// 		return (FUNCTION_TERMINATED_ABNORMALLY);
-// 	}
-
-// 	int i, j;
-// 	int level = node->bc_level, child_num = node->bobj.child_num;
-// 	branch_obj *bobj;
-
-
-// 	// if level>0, save the branching constraint
-// 	if (level > 0)
-// 	{
-// 		for (j = 0; j < node->parent->bobj.child_num; j++)
-// 			if (node->parent->children[j] == node)
-// 				break;
-
-// 		bobj = &(node->parent->bobj);
-// 		bpath[level - 1].type = bobj->type;
-// 		bpath[level - 1].name = bobj->name;
-// 		bpath[level - 1].sense = bobj->sense[j];
-// 		bpath[level - 1].rhs = bobj->rhs[j];
-// 		bpath[level - 1].range = bobj->range[j];
-// 		bpath[level - 1].branch = bobj->branch[j];
-// 	}
-
-// 	// check the policy we want to save dual solutions from the tree
-// 	if ((ws->dual_func->policy == DUALS_SAVE_ALL) ||
-// 		(ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num))
-// 	{
-
-// 		double zerotol = 1e-7;
-// 		// Check for duplicates, then add
-// 		if (!dual_is_duplicate(ws, node, duals_index_row, duals_index_col, 
-// 							   duals_val, *nnz_duals, *num_piece))
-// 		{
-// 			// find nnzs and fill duals related structures
-// 			for (i = 0; i < ws->m; i++)
-// 			{
-// 				if (fabs(node->duals[i]) >= zerotol)
-// 				{
-// 					duals_index_row[*nnz_duals] = *num_piece;
-// 					duals_index_col[*nnz_duals] = i;
-// 					duals_val[*nnz_duals] = node->duals[i];
-// 					(*nnz_duals)++;
-// 				}
-// 			}
-
-// 			for (i = 0; i < ws->n; i++)
-// 			{
-// 				if (fabs(node->dj[i]) >= zerotol)
-// 				{
-// 					djs_index_row[*nnz_djs] = *num_piece;
-// 					djs_index_col[*nnz_djs] = i;
-// 					djs_val[*nnz_djs] = node->dj[i];
-// 					(*nnz_djs)++;
-// 				}
-// 			}
-
-// 			(*num_piece)++;
-// 		}
-
-// 		// If this is a child, we have a term of the disjunction
-// 		if (!child_num)
-// 		{
-// 			if (level == 0)
-// 			{
-// 				assert(*num_paths == 0);
-// 				bpath = NULL;
-// 				bpaths[*num_paths] = NULL;
-// 			}
-// 			else
-// 			{
-// 				bpaths[*num_paths] = (branch_desc *)malloc(sizeof(branch_desc) * level);
-// 				memcpy(bpaths[*num_paths], bpath, sizeof(branch_desc) * level);
-// 				leaf_depth[*num_paths] = level;
-// 				(*num_paths)++;
-// 			}
-// 		}
-// 	}
-
-// 	// if child_num>0, then do recursion on child nodes
-// 	for (j = 0; j < child_num; j++)
-// 		collect_dual_func(ws, node->children[j], bpath, bpaths,
-// 						  leaf_depth, num_paths, num_piece,
-// 						  duals_index_row, duals_index_col, duals_val, nnz_duals,
-// 						  djs_index_row, djs_index_col, djs_val, nnz_djs);
-// }
-
-// /*===========================================================================*/
-
-// int build_dual_func(warm_start_desc *ws)
-// {
-
-// #ifdef SENSITIVITY_ANALYSIS
-// 	if (!ws)
-// 	{
-// 		printf("Warning: NULL pointer in collect_aux_data()\n");
-// 		return (FUNCTION_TERMINATED_ABNORMALLY);
-// 	}
-
-// 	int is_new_df = 0;
-// 	int num_piece = 0;
-// 	int nnz_duals = 0;
-// 	int nnz_djs = 0;
-
-// 	if (!ws->dual_func)
-// 	{
-// 		is_new_df = 1;
-// 		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
-// 		ws->dual_func->policy = DUALS_SAVE_ALL;
-// 	}
-
-// 	int num_paths = get_num_leaf_nodes(ws->rootnode);
-// 	ws->num_paths = num_paths;
-// 	// Allocate the space for the expected number of duals
-// 	// based on the policy
-// 	if ((ws->dual_func->policy == DUALS_SAVE_ALL))
-// 	{
-// 		ws->num_pieces = ws->stat.tree_size;
-// 	}
-// 	else if (ws->dual_func->policy == DUALS_LEAF_ONLY)
-// 	{
-// 		ws->num_pieces = num_paths;
-// 	}
-// 	else
-// 	{
-// 		printf("build_dual_func():\n");
-// 		printf("Policy not supported.\n");
-// 		return (FUNCTION_TERMINATED_ABNORMALLY);
-// 	}
-
-// 	// Allocate memory
-// 	ws->bpaths = (branch_desc **)malloc(sizeof(branch_desc *) * num_paths);
-// 	ws->leaf_depth = (int *)malloc(ISIZE * num_paths);
-// 	// Duals
-// 	int *duals_index_row = (int *)malloc(ISIZE * ws->num_pieces * ws->m);
-// 	int *duals_index_col = (int *)malloc(ISIZE * ws->num_pieces * ws->m);
-// 	double *duals_val = (double *)malloc(DSIZE * ws->num_pieces * ws->m);
-// 	// Reduced costs
-// 	int *djs_index_row = (int *)malloc(ISIZE * ws->num_pieces * ws->n);
-// 	int *djs_index_col = (int *)malloc(ISIZE * ws->num_pieces * ws->n);
-// 	double *djs_val = (double *)malloc(DSIZE * ws->num_pieces * ws->n);
-
-// 	// max_depth allocation for temporary bpath
-// 	branch_desc *bpath = (branch_desc *)malloc(ws->stat.max_depth *
-// 											   sizeof(branch_desc));
-
-// 	num_paths = 0;
-
-// 	collect_dual_func(ws, ws->rootnode, bpath, ws->bpaths, ws->leaf_depth, &num_paths, &num_piece,
-// 					  duals_index_row, duals_index_col, duals_val, &nnz_duals,
-// 					  djs_index_row, djs_index_col, djs_val, &nnz_djs);
-
-// 	// Assert data collected is consistent
-// 	assert(num_paths == ws->num_paths);
-
-// 	print_duals(ws, ws->rootnode, bpath, ws->bpaths, ws->leaf_depth, &num_paths, &num_piece,
-// 				duals_index_row, duals_index_col, duals_val, &nnz_duals,
-// 				djs_index_row, djs_index_col, djs_val, &nnz_djs);
-
-// 	// Construct the Dual Function
-// 	CoinPackedMatrix *duals, *djs;
-// 	duals = new CoinPackedMatrix(false, duals_index_row,
-// 								 duals_index_col, duals_val, nnz_duals);
-// 	djs = new CoinPackedMatrix(false, djs_index_row,
-// 							   djs_index_col, djs_val, nnz_djs);
-// 	if (is_new_df)
-// 	{
-// 		// New Dual Function
-// 		ws->dual_func->duals = duals;
-// 		ws->dual_func->djs = djs;
-// 	}
-// 	else
-// 	{
-// 		// Already existing Dual Function
-// 		// We append to the previous, duplicates have been already checked
-// 		ws->dual_func->duals->bottomAppendPackedMatrix(*duals);
-// 		ws->dual_func->djs->bottomAppendPackedMatrix(*djs);
-// 	}
-// 	return (FUNCTION_TERMINATED_NORMALLY);
-// #else
-// 	printf("build_dual_func():\n");
-// 	printf("Sensitivity analysis features are not enabled.\n");
-// 	printf("Please rebuild SYMPHONY with these features enabled\n");
-// 	return (FUNCTION_TERMINATED_ABNORMALLY);
-
-// #endif
-// }
-
-/*===========================================================================*/
-// TODO: 
-// 1. Check duplicates in CoinPackedMatrix
-// 2. Write function to compute a bound given a rhs and a disjunction
-// (Do we need feasibility status of nodes for that?)
-/*===========================================================================*/
-/*===========================================================================*/

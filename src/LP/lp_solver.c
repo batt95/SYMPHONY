@@ -2674,6 +2674,10 @@ void load_lp_prob(LPdata *lp_data, int scaling, int fastmip)
 {
 
    /* Turn off scaling for CLP */
+
+   // feb223
+   // As of now, dual rays may be incorrect when scaling is on
+   // while we figure this out, turn off scaling
    lp_data->si->setHintParam(OsiDoScale,false,OsiHintDo);
    MIPdesc *mip = lp_data->mip;
 
@@ -3010,6 +3014,8 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       int len = 0;
       int *cstat = (int *)malloc(ISIZE * lp_data->n);
       int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      // int *basis_idx = (int *)malloc(ISIZE * lp_data->m);
+      // si->getBasics(basis_idx);
       get_basis(lp_data, cstat, rstat);
       for (int i = 0; i < lp_data->n; i++){
          if(cstat[i] == VAR_BASIC){
@@ -3024,6 +3030,8 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
          }
       }
       lp_data->basis_len = len;
+
+      assert(len == lp_data->m);
 
       FREE(cstat);
       FREE(rstat);
@@ -3187,6 +3195,8 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       int len = 0;
       int *cstat = (int *)malloc(ISIZE * lp_data->n);
       int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      // int *basis_idx = (int *)malloc(ISIZE * lp_data->m);
+      // si->getBasics(basis_idx);
       get_basis(lp_data, cstat, rstat);
       for (int i = 0; i < lp_data->n; i++){
          if(cstat[i] == VAR_BASIC){
@@ -3201,6 +3211,11 @@ int dual_simplex(LPdata *lp_data, int *iterd)
          }
       }
       lp_data->basis_len = len;
+      // if (len != lp_data->m){
+      //    write_lp(lp_data, "wrong_basis_len");
+      //    assert(false);
+      // }
+      
 
       FREE(cstat);
       FREE(rstat);
@@ -3640,9 +3655,9 @@ void get_dj_pi(LPdata *lp_data)
 void get_dual_ray(LPdata *lp_data)
 {
    std::vector<double *> vRays;
-   vRays = lp_data->si->getDualRays(1, true);
+   // vRays = lp_data->si->getDualRays(1, true);
    
-   // vRays = lp_data->si->getDualRays(1, false);
+   vRays = lp_data->si->getDualRays(1, false);
 
    // check that there is at least one ray
    int raysReturned = static_cast<unsigned int>(vRays.size());
@@ -3656,106 +3671,48 @@ void get_dual_ray(LPdata *lp_data)
       double *ray = vRays[0];
       int i;
 
-      // Check that the ray is not all zeros
+      const double *inverseRowScale = lp_data->si->getModelPtr()->inverseRowScale();
+      const double *rowScale = lp_data->si->getModelPtr()->rowScale();
+      double *rayA = (double *)malloc(sizeof(double) * lp_data->n);
+
+      const CoinPackedMatrix *A = lp_data->si->getMatrixByCol();
+      // A->dumpMatrix();
+      double norm = 0;
+
+      // write_mps(lp_data, "strange_ray");
+
+      // if (inverseRowScale){
+      //    for (i = 0; i < lp_data->m; i++)
+      //    {
+      //       ray[i] /= inverseRowScale[i];
+      //    }
+      // }
+
       for (i = 0; i < lp_data->m; i++)
       {
-         if (fabs(ray[i]) > 1e-5)
-            break;
+         norm += ray[i] * ray[i];
       }
+      norm = sqrt(norm);
+
+      for (i = 0; i < lp_data->m; i++)
+      {
+         ray[i] /= norm;
+      }
+
+      A->transposeTimes(ray, rayA);
+
       // temp: this assert would fail when cuts exist
       // assert(i < lp_data->m);
-      memcpy(lp_data->raysol, ray, (lp_data->m + lp_data->n) * DSIZE);
+      memcpy(lp_data->raysol, ray, (lp_data->m) * DSIZE);
+      memcpy(lp_data->raysol + lp_data->m, rayA, (lp_data->n) * DSIZE);
       
-      // Checking dual ray proof of unboundedness
-      double ray_times_b = 0.0;
-      const double *rhs = lp_data->si->getRightHandSide();
-      const double *lb  = lp_data->si->getColLower();
-      const double *ub  = lp_data->si->getColUpper();
-
-      for (int i = 0; i < lp_data->m; i++){
-         ray_times_b += ray[i]*rhs[i];
-      }
-
-      for (int i = lp_data->m; i < lp_data->m + lp_data->n; i++){
-         if (ray[i] > -1e-5)
-            ray_times_b += ray[i]*lb[i - lp_data->m];
-         else
-            ray_times_b += ray[i]*ub[i - lp_data->m];
-      }
-
-      // assert(ray_times_b <= 1e-5);
       delete[] vRays[0];
+      delete   rayA;
    }
    else
    {
       double *ray = NULL;
    }
-
-   
-
-   // if(lp_data->raysol){
-   // // recompute dj's from scratch
-   //    // double scaleRay = 1/lp_data->raysol[0];
-   //    // for (int i = 0; i < lp_data->m + lp_data->n; i++){
-   //    //    lp_data->raysol[i] *= scaleRay;
-   //    // }
-   //    const double *pi;
-   //    const CoinPackedMatrix *matrix = lp_data->si->getMatrixByCol();
-   //    const int *row = matrix->getIndices();
-   //    const int *columnLength = matrix->getVectorLengths();
-   //    const CoinBigIndex *columnStart = matrix->getVectorStarts();
-   //    const double *elementByColumn = matrix->getElements();
-   //    const double *objective = lp_data->si->getObjCoefficients();
-   //    double *values = (double*)malloc(lp_data->n * DSIZE);
-   //    memcpy(lp_data->dualsol, lp_data->si->getRowPrice(), lp_data->m * DSIZE);
-   //    pi = lp_data->dualsol;
-
-   //    // Follow the ray's direction
-   //    for (int i = 0; i < lp_data->m; i++){
-   //       lp_data->dualsol[i] -= 100000*lp_data->raysol[i];
-   //    }
-
-   //    double *dj = lp_data->dj;
-   //    int numberColumns = lp_data->n;
-   //    int t;
-   //    double rayTimesA = 0.0;
-   //    for (t = 0; t < numberColumns; t++)
-   //    {
-   //       int k;
-   //       // double value = objective[t];
-   //       double value = 0;
-   //       for (k = columnStart[t]; k < columnStart[t] + columnLength[t]; k++)
-   //       {
-   //          int iRow = row[k];
-   //          value += elementByColumn[k] * lp_data->raysol[iRow];
-   //       }
-   //       values[t] = value;
-   //    }
-      
-   //    FREE(values);
-   // // ------------
-   // // Check dual ray proof of unboundedness b * raysol > 0
-   // double lb = 0;
-   // for (int i = 0; i < lp_data->m; i++)
-   // {
-   //    if (lp_data->si->getRowUpper()[i] < 1000000)
-   //    {
-   //       lb += (lp_data->si->getRowUpper()[i]) * lp_data->raysol[i];
-   //    }
-   //    else
-   //    {
-   //       lb += lp_data->si->getRowLower()[i] * lp_data->raysol[i];
-   //    }
-   // }
-   // for (int i = 0; i < lp_data->n; i++){
-   //    if (lp_data->raysol[lp_data->m + i] < 0){
-   //       lb += lp_data->si->getColUpper()[i] * lp_data->raysol[lp_data->m + i];
-   //    } else {
-   //       lb += lp_data->si->getColLower()[i] * lp_data->raysol[lp_data->m + i];
-   //    }
-   // }
-   // assert(lb > -1e-5);
-   // } 
 }
 
 /*===========================================================================*/

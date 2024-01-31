@@ -127,6 +127,7 @@ typedef struct LP_PROB{
    double       *dj; /* To save the reduced costs of the node */
    /************************************************************/
    // feb223
+   // double       *raysol;    /* To save the dual ray of the node */
    int          *basis_idx; /* To save the LP basis of the node */
    int           basis_len; /* Length of the basis <= n + m */
    /************************************************************/

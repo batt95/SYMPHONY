@@ -1982,6 +1982,10 @@ SYMPHONYLIB_EXPORT int sym_warm_solve(sym_environment *env)
    FREE(cru_vars);
    FREE(cut_ind);
    FREE(tmp_ind);
+
+   // FILE *f = fopen("tree_2.txt", "w");
+	// write_tree(env->warm_start->rootnode, f);
+	// fclose(f);
    
    return(sym_solve(env));
 }
@@ -6907,73 +6911,13 @@ SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
 }
 
 SYMPHONYLIB_EXPORT int sym_build_dual_func(sym_environment *env) {
-   env->warm_start->n = env->mip->n;
-   env->warm_start->m = env->mip->m;
-   return build_dual_func(env->warm_start, env->mip);
+   return build_dual_func(env);
 }
 
 SYMPHONYLIB_EXPORT int sym_evaluate_dual_function(sym_environment *env, 
                               double *new_rhs, int size_new_rhs, double *dual_bound) {
    return evaluate_dual_function(env->warm_start, env->mip, new_rhs, 
                                           size_new_rhs, dual_bound);
-}
-
-SYMPHONYLIB_EXPORT int sym_print_dual_func(warm_start_desc *ws) {
-   print_dual_function(ws);
-   return 1;
-}
-
-SYMPHONYLIB_EXPORT int check_dual_solutions(MIPdesc *mip, dual_func_desc *df){
-   int first, last;
-   int k, idx;
-   int n = mip->n, m = mip->m, nz = mip->nz;
-   int *matind = (mip->matind);
-   int *matbeg = (mip->matbeg);
-   double *matval = (mip->matval);
-   int ok = FALSE;
-   
-   double *obj = (mip->obj);
-   double *rhs; 
-
-   const double* elem = df->duals->getElements();
-   const int* indices = df->duals->getIndices();
-
-   for (int i = 0; i < df->num_pieces; i++){
-      k = 0;
-      rhs = (double *)calloc(n, DSIZE);
-      first = df->duals->getVectorFirst(i);
-		last = df->duals->getVectorLast(i);
-      idx = -1;
-      for (k = 0; k < nz; k++){
-         if (matind[k] == 0) idx++;
-         for (int j = first; j < last; ++j){
-            if (matind[k] == indices[j]){
-               // printf("%d : %d - %.2f : %.2f \n", indices[j], idx, elem[j], matval[k]);
-               rhs[idx] += elem[j] * matval[k];
-            }
-		   }
-      }
-
-      for (int j = first; j < last; j++){
-         if (indices[j] >= m){
-            // printf("%d : %.3f \n", indices[j] - m, elem[j]);
-            rhs[indices[j] - m] += elem[j];
-         }
-      }
-      ok = TRUE;
-      for (int j = 0; j < n; j++){
-         // printf("%d \n", j);
-         if(rhs[j] - obj[j] > 1e-5) 
-            ok = FALSE;
-      }
-      if(ok)
-         printf("DUAL %d OK!\n", i);
-      else
-         printf("DUAL %d NOT FEASIBLE!\n", i);
-   }
-
-   FREE(rhs);
-   return 1;
 }
 
 /*===========================================================================*/

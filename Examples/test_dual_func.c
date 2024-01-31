@@ -101,8 +101,8 @@ int main(int argc, char **argv)
    rhss[1] = 1500.00;
 
    sym_evaluate_dual_function(env_warm, rhss, m, &dualFuncObj);
-
-   assert(warmObjVal >= dualFuncObj);
+   printf("DUAL FUNC OBJ : %.5f\n", dualFuncObj);
+   assert(fabs(warmObjVal -dualFuncObj) < 1e-5);
    // assert(warmObjVal == dualFuncObj);
 
    // free(rhss);
@@ -120,7 +120,10 @@ int main(int argc, char **argv)
       printf("RHS %d\n", i);
 
       // Generate a random new rhs
-      generate_rand_array(m, 2000, 5000, rhs);
+      generate_rand_array(m, 500, 2000, rhs);
+
+      printf("RHS %d\n", i);
+      printf("RHS: (%.2f, %.2f)\n", rhs[0], rhs[1]);
 
       rhss[count++] = rhs[0];
       rhss[count++] = rhs[1];
@@ -134,6 +137,12 @@ int main(int argc, char **argv)
 
       sym_build_dual_func(env_warm);
 
+      sym_get_obj_val(env_warm, &warmObjVal);
+      printf("WARM OBJ : %.5f\n", warmObjVal);
+
+      sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
+      printf("DUAL FUNC OBJ : %.5f\n", dualFuncObj);
+      assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
       // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
    }
 
@@ -156,8 +165,9 @@ int main(int argc, char **argv)
       printf("WARM OBJ : %.5f\n", warmObjVal);
 
       sym_evaluate_dual_function(env_warm, rhss + count, m, &dualFuncObj);
-      assert(warmObjVal >= dualFuncObj);
-      // assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
+      printf("DUAL FUNC OBJ : %.5f\n", dualFuncObj);
+      // assert(warmObjVal >= dualFuncObj);
+      assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
 
       count += m;
 
@@ -191,7 +201,7 @@ int main(int argc, char **argv)
 
       printf("RHS: (%.2f, %.2f)\n", rhs[0], rhs[1]);
       sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-      printf("DUAL FUNC: %.5f\n", dualFuncObj);
+      printf("BEFORE DUAL FUNC: %.5f\n", dualFuncObj);
 
       // assert(dualFuncObj - coldObjVal < 1e-5 || fabs(dualFuncObj - coldObjVal) < 1e-5);
       assert(coldObjVal >= dualFuncObj);
@@ -200,7 +210,8 @@ int main(int argc, char **argv)
       }
 
       sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-      assert(coldObjVal >= dualFuncObj);
+      printf("AFTER DUAL FUNC: %.5f\n", dualFuncObj);
+      assert(fabs(dualFuncObj - coldObjVal) < 1e-5);
       // assert(fabs(dualFuncObj - coldObjVal) < 1e-5);
    
    }

@@ -947,18 +947,20 @@ typedef struct DISJUNCTION_DESC{
 } disjunction_desc;
 
 typedef struct DUAL_FUNC_DESC{
-   // dual_solution      *duals;
-   // int                 num_pieces;
+   // Parameters
    int                 policy;
-   dual_hash          *hashtb;
-   int                 num_pieces;
+   double              granularity;
    // dual pieces and reduced costs
+   // Hash table to keep uniqueness of dual pieces
+   dual_hash          *hashtb;
    CoinPackedMatrix   *duals;
+   int                 num_pieces;
    // dual rays that proves infeasibility
-   CoinPackedMatrix   *rays;
+   double            **rays;
+   int                 num_rays;
    // disjunction description
    disjunction_desc   *disj;
-   int                 num_terms;     // num of disjunction terms     
+   int                 num_terms; 
 }dual_func_desc;
 
 typedef struct WARM_START_DESC{
