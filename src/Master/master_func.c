@@ -4217,6 +4217,7 @@ int build_dual_func(sym_environment *env)
 			// Already existing Dual Function
 			// We append to the previous, duplicates have been already checked
 			ws->dual_func->duals->bottomAppendPackedMatrix(*df);
+			delete df;
 		}
 
 		// There should be a limit on the number of dual solutions we can collect
@@ -4315,7 +4316,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	double *rhs_times_pi = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
 	int *is_infty = (int *)calloc(ws->dual_func->num_pieces, ISIZE);
 	int *dj_start = (int *)malloc(ws->dual_func->num_pieces * ISIZE);
-	bool *is_term_feas;
+	bool *is_term_feas = NULL;
 	double *ray;
 	double *lb = (double *)malloc(ws->n * sizeof(double));
 	double *ub = (double *)malloc(ws->n * sizeof(double)); 
@@ -4515,7 +4516,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			idx = disj->ubvaridx[i];
 			ub[idx] = disj->ub[i];
 		}
-#if 1	
+#if 0	
 		si->loadProblem(ws->n, ws->m,
 							mip->matbeg, mip->matind,
 							mip->matval, lb,
@@ -4606,6 +4607,8 @@ TERM_EVAL_DUAL_FUNC:
 	FREE(lb);
 	FREE(ub);
 	FREE(rhs);
+	if (is_term_feas);	
+		FREE(is_term_feas);
 
 #if 1 
 	delete si;

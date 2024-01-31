@@ -3707,7 +3707,7 @@ void get_dual_ray(LPdata *lp_data)
       memcpy(lp_data->raysol + lp_data->m, rayA, (lp_data->n) * DSIZE);
       
       delete[] vRays[0];
-      delete   rayA;
+      FREE(rayA);
    }
    else
    {
