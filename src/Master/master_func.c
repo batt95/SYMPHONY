@@ -4249,17 +4249,17 @@ int build_dual_func(sym_environment *env)
 	FREE(duals_index_col);
 	FREE(duals_val);
 
-	// printf("==========================\n");
-	// printf("RAYS\n");
-	// printf("==========================\n");
-	// for (int i = 0; i < ws->dual_func->num_rays; i++){
-	// 	for (int j = 0; j < ws->m + ws->n; j++){
-	// 		printf("%.10f ", ws->dual_func->rays[i][j]);
-	// 	}
-	// 	printf("\n------------------------\n");
-	// }
+	printf("==========================\n");
+	printf("RAYS\n");
+	printf("==========================\n");
+	for (int i = 0; i < ws->dual_func->num_rays; i++){
+		for (int j = 0; j < ws->m + ws->n; j++){
+			printf("%.10f ", ws->dual_func->rays[i][j]);
+		}
+		printf("\n------------------------\n");
+	}
 
-	// print_dual_function(ws);
+	print_dual_function(ws);
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
 	printf("build_dual_func():\n");
