@@ -6831,83 +6831,15 @@ SYMPHONYLIB_EXPORT int sym_get_ub_for_new_obj(sym_environment *env, int cnt,
 /*===========================================================================*/
 /*===========================================================================*/
 // feb223
-SYMPHONYLIB_EXPORT void print_tree(bc_node *node) {
-   int i, n = 6;
-   bc_node * child;
-   // This might be useful at some point
-   // CoinPackedMatrix *matrix;
-   // const int * columnLength = matrix->getVectorLengths();
-   // const CoinBigIndex * columnStart = matrix->getVectorStarts();
-   // const double * elementByColumn = matrix->getElements();
-   // How to use CoinPackedMatrix
-   // for (k=columnStart[t];k<columnStart[t]+columnLength[t];k++) {
-	//    int iRow=row[k];
-	//    value -= elementByColumn[k]*pi[iRow];
-   // }
-   if(node){
-      if (node->bc_index == 0){
-         printf("================================\n");
-         printf("Branch and Bound Tree\n");
-         printf("================================\n");
-         // Root node
-         printf ("Id %d level %d, root->node_status is %d and node->feasibility_status is %d.\n", node->bc_index, node->bc_level, node->node_status, node->feasibility_status);
-         if (node->duals){
-            printf("root has duals! %.5f, %.5f \n", node->duals[0], node->duals[1]);
-         }
-         if (node->dj){
-            printf("root has dj\n");
-            for (int j = 0; j < n; j++){
-               printf("%.3f\n", node->dj[j]);
-            }
-         }
-
-         if (!node->children) {
-            printf("Leaf node!\n");
-         } else {
-            for (int j = 0; j < node->bobj.child_num; j++){
-               printf("%d : Branched on X_%d %c %.3f\n",
-                      j, node->bobj.name, node->bobj.sense[j], node->bobj.rhs[j]);
-            }
-         }
-         printf("Bound: %.5f\n", node->lower_bound);
-         printf("--------------------------\n");
-      } else {
-
-         printf ("Id %d level %d, node->node_status is %d and node->feasibility_status is %d.\n", node->bc_index, node->bc_level, node->node_status, node->feasibility_status);
-         printf("Parent: %d\n", node->parent->bc_index);
-
-         if (node->duals){
-            printf("node has duals! %.5f, %.5f \n", node->duals[0], node->duals[1]);
-         }
-
-         if (node->rays){
-            printf("node has rays! %.5f, %.5f \n", node->rays[0], node->rays[1]);
-         }
-         if (node->dj){
-            printf("node has dj\n");
-            for (int j = 0; j < n; j++){
-               printf("%.3f\n", node->dj[j]);
-            }
-         }
-
-         if (!node->children) {
-            printf("Leaf node!\n");
-         } else {
-            for (int j = 0; j < node->bobj.child_num; j++){
-               printf("%d : Branched on X_%d %c %.3f\n",
-                      j, node->bobj.name, node->bobj.sense[j], node->bobj.rhs[j]);
-            }
-         }
-         printf("Bound: %.5f\n", node->lower_bound);
-         printf("--------------------------\n");
-      }   
-      // Children
-      for (i = 0; i < node->bobj.child_num; i++){
-         child = node->children[i];
-         // child->intcpt = node->bobj.intcpt[i];
-         print_tree(child);
-      }
-   }
+SYMPHONYLIB_EXPORT void print_dual_function(sym_environment *env) {
+#ifdef SENSITIVITY_ANALYSIS
+   print_dual_function(env->warm_start);
+#else
+   printf("print_dual_function():\n");
+   printf("Sensitivity analysis features are not enabled.\n"); 
+   printf("Please rebuild SYMPHONY with these features enabled\n");
+   return;
+#endif
 }
 
 SYMPHONYLIB_EXPORT int sym_build_dual_func(sym_environment *env) {

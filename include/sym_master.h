@@ -183,6 +183,7 @@ void free_master PROTO((sym_environment *env));
 #endif
 
 // feb223
+void print_dual_function PROTO((warm_start_desc *ws));
 int build_dual_func PROTO((sym_environment *env));
 int evaluate_dual_function PROTO((warm_start_desc *ws, MIPdesc *mip, 
 						double *new_rhs, int size_new_rhs, double *dual_bound));

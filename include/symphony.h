@@ -388,6 +388,7 @@ SYMPHONYLIB_EXPORT double sym_wall_clock(double *T);
 SYMPHONYLIB_EXPORT int sym_set_param(sym_environment *env, char *line);
 SYMPHONYLIB_EXPORT int sym_free_env(sym_environment *env);
 
+SYMPHONYLIB_EXPORT void print_dual_function(sym_environment *env);
 SYMPHONYLIB_EXPORT int sym_build_dual_func(sym_environment *env);
 SYMPHONYLIB_EXPORT int sym_evaluate_dual_function(sym_environment *env, 
                               double *new_rhs, int size_new_rhs, double *dual_bound);
