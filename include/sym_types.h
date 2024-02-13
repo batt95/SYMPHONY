@@ -960,6 +960,7 @@ typedef struct DUAL_FUNC_DESC{
    int                 num_rays;
    // disjunction description
    disjunction_desc   *disj;
+   int                *feas_stati;
    int                 num_terms; 
 }dual_func_desc;
 

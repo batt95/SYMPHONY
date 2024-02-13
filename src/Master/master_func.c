@@ -35,6 +35,8 @@
 // #include "sym_lp.h"
 #include "sym_tm.h"
 
+#define SENSITIVITY_ANALYSIS
+
 /*===========================================================================*/
 /*===========================================================================*/
 
@@ -3605,6 +3607,7 @@ void free_disjunction(dual_func_desc *dual_func){
 	}
 		
 	FREE(dual_func->disj);
+	FREE(dual_func->feas_stati);
 }
 
 void free_master(sym_environment *env)
@@ -3833,6 +3836,29 @@ void print_dual_function(warm_start_desc *ws)
 	printf("==========================\n");
 	for (int i = 0; i < ws->dual_func->num_terms; i++)
 	{
+		printf("Feasibility Status: ");
+		switch (ws->dual_func->feas_stati[i])
+		{
+		case ROOT_NODE:
+			printf("ROOT_NODE\n");
+			break;
+		
+		case INFEASIBLE_PRUNED:
+			printf("INFEASIBLE_PRUNED\n");
+			break;
+		
+		case FEASIBLE_PRUNED:
+			printf("FEASIBLE_PRUNED\n");
+			break;
+
+		case OVER_UB_PRUNED:
+			printf("OVER_UB_PRUNED\n");
+			break;
+		
+		default:
+			printf("UNKNOWN\n");
+			break;
+		}
 		printDisjunction(ws->dual_func->disj[i]);
 	}
 
@@ -3877,15 +3903,15 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
 
 // int count_leaf = 0;
 
-int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
+void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				  branch_desc *bpath, int* curr_term, int* curr_piece, int* curr_ray, double** rays,
 				  int *duals_index_row, int *duals_index_col, double *duals_val,
-				  int *nnz_duals, int *max_poss_nnz){
+				  int *nnz_duals, int *max_poss_nnz, int *curr_leaf){
 
 	if (node == NULL)
 	{
 		printf("Warning: NULL pointer in get_leaf_node_data()\n");
-		return (FUNCTION_TERMINATED_ABNORMALLY);
+		return;
 	}
 
 	// if (!node->parent) count_leaf = 0;
@@ -3921,7 +3947,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			bpath[level - 1].branch = bobj->branch[j];
 		}
 	}
-
 	// check feasibility status of this node
 	if (node->feasibility_status == ROOT_NODE ||
 		node->feasibility_status == FEASIBLE_PRUNED ||
@@ -3980,7 +4005,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			}
 		}
 	}
-
 	// Must collect the ray
 	if (node->rays){
 
@@ -4034,6 +4058,7 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	// If this is a child, we have a term of the disjunction
 	if (!child_num)
 	{
+		ws->dual_func->feas_stati[(*curr_leaf)++] = node->feasibility_status; 
 		// printf(" - %d Fesibility status of this leaf: %d\n", count_leaf++, node->feasibility_status);
 		if (level > 0)
 		{
@@ -4043,7 +4068,6 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			double *ub = (double *)malloc(DSIZE * ws->n);
 			memcpy(lb, mip->lb, DSIZE * ws->n);
 			memcpy(ub, mip->ub, DSIZE * ws->n);
-
 			for (int i = 0; i < level; i++){
 				varidx = bpath[i].name;
 				switch (bpath[i].sense)
@@ -4115,12 +4139,13 @@ int collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			FREE(lb);
 			FREE(ub);
 		}
-	} 
+	} else {
+		// if child_num > 0, then do recursion on child nodes
+		for (j = 0; j < child_num; j++)
+			collect_duals(ws, node->children[j], mip, bpath, curr_term, curr_piece, curr_ray, rays,
+						duals_index_row, duals_index_col, duals_val, nnz_duals, max_poss_nnz, curr_leaf);
 
-	// if child_num > 0, then do recursion on child nodes
-	for (j = 0; j < child_num; j++)
-		collect_duals(ws, node->children[j], mip, bpath, curr_term, curr_piece, curr_ray, rays,
-					  duals_index_row, duals_index_col, duals_val, nnz_duals, max_poss_nnz);
+	}
 }
 
 int build_dual_func(sym_environment *env)
@@ -4154,6 +4179,7 @@ int build_dual_func(sym_environment *env)
 		ws->dual_func->rays = NULL;
 		ws->dual_func->num_rays = 0;
 		ws->dual_func->disj = NULL;
+		ws->dual_func->feas_stati = NULL;
 		ws->dual_func->num_terms = 0;
 	} else {
 		// Delete the previous disjunction, there will be a new one
@@ -4183,6 +4209,7 @@ int build_dual_func(sym_environment *env)
 
 	// Allocate memory for disjunction
 	ws->dual_func->disj = (disjunction_desc*)malloc(sizeof(disjunction_desc) * num_leaf);
+	ws->dual_func->feas_stati = (int*)malloc(sizeof(int) * num_leaf);
 
 	// Allocate memory for rays to be collected
 	double **rays = (double**)malloc(sizeof(double*) * num_rays);
@@ -4202,8 +4229,10 @@ int build_dual_func(sym_environment *env)
 	int curr_ray = 0;   // current ray
 	int tot_piece = 0; // DEBUG: to check how sparse it is
 
+	int curr_leaf = 0; // Debug: check the stati of leaves
+
 	collect_duals(ws, ws->rootnode, mip, bpath, &curr_term, &curr_piece, &curr_ray, rays,
-				 duals_index_row, duals_index_col, duals_val, &nnz_duals, &tot_piece);
+				 duals_index_row, duals_index_col, duals_val, &nnz_duals, &tot_piece, &curr_leaf);
 
 	// Update the actual number of disjunction terms
 	// Infeasible leaf lead to infeasible disjunction term
