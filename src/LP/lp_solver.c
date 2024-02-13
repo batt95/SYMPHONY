@@ -3670,6 +3670,7 @@ void get_dual_ray(LPdata *lp_data)
    {
       double *ray = vRays[0];
       int i;
+      bool is_ray_empty = TRUE;
 
       const double *inverseRowScale = lp_data->si->getModelPtr()->inverseRowScale();
       const double *rowScale = lp_data->si->getModelPtr()->rowScale();
@@ -3678,6 +3679,18 @@ void get_dual_ray(LPdata *lp_data)
       const CoinPackedMatrix *A = lp_data->si->getMatrixByCol();
       // A->dumpMatrix();
       double norm = 0;
+
+      for (i = 0; i < lp_data->m; i++)
+      {
+         if (fabs(ray[i] > 1e-5)){
+            is_ray_empty = FALSE;
+            break;
+         }
+      } 
+
+      // if (is_ray_empty){
+      //    printf("RAY IS EMPTY!\n");
+      // }
 
       // write_mps(lp_data, "strange_ray");
 
@@ -3694,11 +3707,13 @@ void get_dual_ray(LPdata *lp_data)
       }
       norm = sqrt(norm);
 
-      for (i = 0; i < lp_data->m; i++)
-      {
-         ray[i] /= norm;
+      if (norm > 1e-7){
+         for (i = 0; i < lp_data->m; i++)
+         {
+            ray[i] /= norm;
+         }
       }
-
+         
       A->transposeTimes(ray, rayA);
 
       // temp: this assert would fail when cuts exist

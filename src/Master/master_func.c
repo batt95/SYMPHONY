@@ -3836,15 +3836,15 @@ void print_dual_function(warm_start_desc *ws)
 		printDisjunction(ws->dual_func->disj[i]);
 	}
 
-	printf("==========================\n");
-	printf("BASIS\n");
-	printf("==========================\n");
-	for (dual_hash *s = ws->dual_func->hashtb; s != NULL; s = (dual_hash *)(s->hh.next)) {
-        for (int i = 0; i < s->len; i++){
-			printf("%d ", s->basis_idx[i]);
-		}
-		printf("\n");
-    }
+	// printf("==========================\n");
+	// printf("BASIS\n");
+	// printf("==========================\n");
+	// for (dual_hash *s = ws->dual_func->hashtb; s != NULL; s = (dual_hash *)(s->hh.next)) {
+    //     for (int i = 0; i < s->len; i++){
+	// 		printf("%d ", s->basis_idx[i]);
+	// 	}
+	// 	printf("\n");
+    // }
 }
 
 /*===========================================================================*/
@@ -4301,7 +4301,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		printf("Warning: None or empty dual function in evaluate_dual_func()\n");
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
-#if 1
+#if 0
 	// For sanity check
 	double sanity_objVal = 0;
 	OsiXSolverInterface *si = new OsiXSolverInterface();
@@ -4462,7 +4462,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		}
 	}
 
-#if 1
+#if 0
 	// This is a sanity check if the rays prove primal infeasibility
 	si->setHintParam(OsiDoReducePrint);
     si->messageHandler()->setLogLevel(0);
@@ -4626,7 +4626,7 @@ TERM_EVAL_DUAL_FUNC:
 	if (is_term_feas);	
 		FREE(is_term_feas);
 
-#if 1 
+#if 0
 	delete si;
 #endif
 
