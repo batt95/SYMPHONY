@@ -4320,13 +4320,19 @@ int build_dual_func(sym_environment *env)
 
 			// Move new rays into dual_func_desc
 			for (int i = 0; i < curr_ray; i++){
-				ws->dual_func->rays[ws->dual_func->num_rays + i] = rays[i];
+				ws->dual_func->rays[ws->dual_func->num_rays + i] = 
+					(double *)malloc(DSIZE * (ws->m + ws->n));
+				memcpy(ws->dual_func->rays[ws->dual_func->num_rays + i], 
+						rays[i], (ws->m + ws->n) * DSIZE);
 			}
 
 			ws->dual_func->num_rays += curr_ray;
 		}
 	}
 
+	for (int i = 0; i < curr_ray; i++){
+		FREE(rays[i]);
+	}
 	FREE(rays);
 	FREE(bpath);
 	FREE(duals_index_row);
