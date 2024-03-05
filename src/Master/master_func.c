@@ -3800,6 +3800,18 @@ void print_dual_function(warm_start_desc *ws)
 	}
 
 	printf("==========================\n");
+	printf("DUAL FUNCTION INFO\n");
+	printf("==========================\n");
+	if (ws->dual_func->policy == DUALS_LEAF_ONLY)
+		printf("Policy: DUALS_LEAF_ONLY\n");
+	else if (ws->dual_func->policy == DUALS_SAVE_ALL)
+		printf("Policy: DUALS_SAVE_ALL\n");
+	printf("Granularity: %.10f\n", ws->dual_func->granularity);
+	printf("Num rays: %d\n", ws->dual_func->num_rays);
+	printf("Num dual sol: %d\n", ws->dual_func->num_pieces);
+	printf("Num terms: %d\n", ws->dual_func->num_terms);
+
+	printf("==========================\n");
 	printf("RAYS\n");
 	printf("==========================\n");
 	if (ws->dual_func->num_rays == 0){
@@ -3913,10 +3925,6 @@ void print_dual_function(warm_start_desc *ws)
 }
 
 /*===========================================================================*/
-
-/*----------------- Policy to save dual func from nodes ---------------------*/
-#define DUALS_SAVE_ALL 0
-#define DUALS_LEAF_ONLY 1
 
 int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
     dual_hash *s;

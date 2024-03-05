@@ -586,3 +586,9 @@
 #define FR_SEARCH                0
 #define RINS_SEARCH              1 
 
+// feb223
+
+/*----------------- Policy to save dual func from nodes -------------------*/
+#define DUALS_SAVE_ALL 0
+#define DUALS_LEAF_ONLY 1
+
