@@ -1723,7 +1723,7 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 		     //Anahita
 		     if (can->termcode[j] == LP_D_UNBOUNDED){ 
 			get_dual_ray(lp_data);
-			if (lp_data->raysol){
+			if (lp_data->has_ray){
 			   can->rays[j] =
 			      (double *) malloc(DSIZE*(lp_data->n + lp_data->m));
 			   memcpy(can->rays[j], lp_data->raysol,
@@ -1856,7 +1856,7 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 		     //Anahita
 		     if (can->termcode[j] == LP_D_UNBOUNDED){ 
 			get_dual_ray(lp_data);
-			if (lp_data->raysol){
+			if (lp_data->has_ray){
 			   can->rays[j] =
 			      (double *) malloc(DSIZE*(lp_data->n + lp_data->m));
 			   memcpy(can->rays[j], lp_data->raysol,

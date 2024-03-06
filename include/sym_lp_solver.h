@@ -207,6 +207,7 @@ typedef struct LPDATA{
    double    *raysol;
    double    intcpt;
    // feb223
+   int        has_ray;
    int       *basis_idx;
    int        basis_len;
 #endif

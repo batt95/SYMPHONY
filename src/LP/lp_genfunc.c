@@ -381,12 +381,14 @@ int fathom_branch(lp_prob *p)
       }
       if (p->par.sensitivity_bounds)
       {
-         // if (termcode == LP_D_UNBOUNDED){
-         //    if (!p->raysol && lp_data->raysol){
-         //       p->raysol = (double *)malloc((lp_data->m + lp_data->n) * DSIZE);
-         //    }
-         //    memcpy(p->raysol, lp_data->raysol, (lp_data->m + lp_data->n) * DSIZE);
-         // }
+         if (termcode == LP_D_UNBOUNDED){
+            if (lp_data->has_ray && !p->raysol){
+               p->raysol = (double *)malloc((lp_data->m + lp_data->n) * DSIZE);
+            }
+            if (lp_data->has_ray){
+               memcpy(p->raysol, lp_data->raysol, (lp_data->m + lp_data->n) * DSIZE);
+            }
+         }
          // feb223
          if (!p->basis_idx && lp_data->basis_len)
          {

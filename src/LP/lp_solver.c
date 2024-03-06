@@ -213,6 +213,7 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          FREE(lp_data->raysol);
          // lp_data->raysol = (double *)malloc(lp_data->maxm * DSIZE);
          lp_data->raysol = (double *)malloc((lp_data->m + lp_data->n) * DSIZE);
+         lp_data->has_ray = FALSE;
          //
          FREE(lp_data->slacks);
          lp_data->slacks = (double *)malloc(lp_data->maxm * DSIZE);
@@ -3010,6 +3011,11 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
          // lp_data->basis_len = 0;
       }
 
+      if (term != LP_D_UNBOUNDED)
+      {
+         lp_data->has_ray = FALSE;
+      }
+
       // feb223
       int len = 0;
       int *cstat = (int *)malloc(ISIZE * lp_data->n);
@@ -3191,6 +3197,11 @@ int dual_simplex(LPdata *lp_data, int *iterd)
          // lp_data->basis_len = 0;
       }
 
+      if (term != LP_D_UNBOUNDED)
+      {
+         lp_data->has_ray = FALSE;
+      }
+
       // feb223
       int len = 0;
       int *cstat = (int *)malloc(ISIZE * lp_data->n);
@@ -3363,6 +3374,11 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
          get_dual_ray(lp_data); 
          // lp_data->basis_idx = NULL; 
          // lp_data->basis_len = 0;
+      }
+
+      if (term != LP_D_UNBOUNDED)
+      {
+         lp_data->has_ray = FALSE;
       }
 
       // for (int i = 0; i < lp_data->basis_len; i++){
@@ -3682,7 +3698,7 @@ void get_dual_ray(LPdata *lp_data)
 
       for (i = 0; i < lp_data->m; i++)
       {
-         if (fabs(ray[i] > 1e-5)){
+         if (fabs(ray[i]) > 1e-5){
             is_ray_empty = FALSE;
             break;
          }
@@ -3720,6 +3736,8 @@ void get_dual_ray(LPdata *lp_data)
       // assert(i < lp_data->m);
       memcpy(lp_data->raysol, ray, (lp_data->m) * DSIZE);
       memcpy(lp_data->raysol + lp_data->m, rayA, (lp_data->n) * DSIZE);
+
+      lp_data->has_ray = TRUE;
       
       delete[] vRays[0];
       FREE(rayA);
@@ -3727,6 +3745,7 @@ void get_dual_ray(LPdata *lp_data)
    else
    {
       double *ray = NULL;
+      lp_data->has_ray = FALSE;
    }
 }
 

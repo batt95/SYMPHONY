@@ -70,9 +70,6 @@ int main(int argc, char **argv)
    sym_load_problem(env_warm);
    sym_load_problem(env_cold);
 
-   int m = env_cold->mip->m;
-   // double *rhs = (double*)malloc(sizeof(double) * m);
-
    sym_set_int_param(env_warm, "verbosity", -2);
    sym_set_int_param(env_cold, "verbosity", -2);
 
@@ -114,172 +111,127 @@ int main(int argc, char **argv)
    sym_set_int_param(env_cold, "generate_cgl_cuts", FALSE);
    sym_set_int_param(env_cold, "max_active_nodes", 1);
 
+   //----------------------
+   // linspace numpy-like 
+   //----------------------
+   // double a = -16, b = 5, zerotol = 1e-7;
+   // int pieces = 2000;
+   // double *zeta_lst = linspace(a, b, pieces);
+   // double *zeta_lst_1 = linspace(-15, 5, 10);
+   // double *rvf_lst  = (double*)malloc(sizeof(double) * pieces);
+   // double *df_lst   = (double*)malloc(sizeof(double) * pieces);
 
-   double a = -16, b = 5, zerotol = 1e-7;
-   int pieces = 2000;
-   double *zeta_lst = linspace(a, b, pieces);
-   double *zeta_lst_1 = linspace(-15, 5, 10);
-   double *rvf_lst  = (double*)malloc(sizeof(double) * pieces);
-   double *df_lst   = (double*)malloc(sizeof(double) * pieces);
-
-   double rhs;
-
-   // Compute RVF using cold env
-   for (int i = 0; i < pieces; i++){
-      rhs = zeta_lst[i];
-      // Set the new RHS
-      set_rhs(env_cold, &rhs, 1);
-      // sym_write_lp(env_cold, "rvf_example");
-      if ((termcode = sym_solve(env_cold)) < 0){
-         printf("Something went wrong on computing RVF!\n");
-         exit(1);
-      }
-
-      sym_get_obj_val(env_cold, rvf_lst + i);
-   } 
-
-   for (int i = 0; i < pieces; i++){
-      // sym_evaluate_dual_function(env_warm, zeta_lst + i, 1, df_lst + i);
-      if (i % 100 == 0){
-         printf("RVF evaluates %.7f at zeta = %.7f\n", rvf_lst[i], zeta_lst[i]);
-      }
-   }
-
-   // First dual function at zeta = 40/9
-   rhs = 40.0/9.0;
-   set_rhs(env_warm, &rhs, 1);
-   if ((termcode = sym_solve(env_warm)) < 0){
-      printf("Something went wrong on Warm env!\n");
-      exit(1);
-   }
-
-   sym_build_dual_func(env_warm);
-
-   for (int i = 0; i < pieces; i++){
-      sym_evaluate_dual_function(env_warm, zeta_lst + i, 1, df_lst + i);
-      if (i % 100 == 0){
-         printf("Dual func evaluates %.7f at zeta = %.7f\n", df_lst[i], zeta_lst[i]);
-      }
-   }
-
-   // Second dual function at zeta = 40/9, -6
-   printf("===============================================\n");
-   rhs = -6;
-   set_rhs(env_warm, &rhs, 1);
-   if ((termcode = sym_warm_solve(env_warm)) < 0){
-      printf("Something went wrong on Warm env!\n");
-      exit(1);
-   }
-
-   sym_build_dual_func(env_warm);
-
-   for (int i = 0; i < pieces; i++){
-      sym_evaluate_dual_function(env_warm, zeta_lst + i, 1, df_lst + i);
-      assert(df_lst[i] - rvf_lst[i] < zerotol);
-      if (i % 100 == 0){
-         printf("Dual func evaluates %.7f at zeta = %.7f\n", df_lst[i], zeta_lst[i]);
-      }
-   }
-
-   printf("===============================================\n");
-   rhs = -11;
-   set_rhs(env_warm, &rhs, 1);
-   if ((termcode = sym_warm_solve(env_warm)) < 0){
-      printf("Something went wrong on Warm env!\n");
-      exit(1);
-   }
-
-   sym_build_dual_func(env_warm);
-
-   for (int i = 0; i < pieces; i++){
-      sym_evaluate_dual_function(env_warm, zeta_lst + i, 1, df_lst + i);
-      assert(df_lst[i] - rvf_lst[i] < zerotol);
-      if (i % 100 == 0){
-         printf("Dual func evaluates %.7f at zeta = %.7f\n", df_lst[i], zeta_lst[i]);
-      }
-   }
-   printf("===============================================\n");
-   rhs = -7;
-   set_rhs(env_warm, &rhs, 1);
-   if ((termcode = sym_warm_solve(env_warm)) < 0){
-      printf("Something went wrong on Warm env!\n");
-      exit(1);
-   }
-
-   sym_build_dual_func(env_warm);
-
-   for (int i = 0; i < pieces; i++){
-      sym_evaluate_dual_function(env_warm, zeta_lst + i, 1, df_lst + i);
-      assert(df_lst[i] - rvf_lst[i] < zerotol);
-      if (i % 100 == 0){
-         printf("Dual func evaluates %.7f at zeta = %.7f\n", df_lst[i], zeta_lst[i]);
-      }
-   }
-
-   printf("===============================================\n");
-   for (int i = 0; i < 10; i++){
-      set_rhs(env_warm, zeta_lst_1 + i, 1);
-      if ((termcode = sym_warm_solve(env_warm)) < 0){
-         printf("Something went wrong on Warm env!\n");
-         exit(1);
-      }
-
-      sym_build_dual_func(env_warm);
-   }
-
-   for (int i = 0; i < pieces; i++){
-      sym_evaluate_dual_function(env_warm, zeta_lst + i, 1, df_lst + i);
-      assert(fabs(df_lst[i] - rvf_lst[i]) < zerotol);
-      if (i % 100 == 0){
-         printf("Dual func evaluates %.7f at zeta = %.7f\n", df_lst[i], zeta_lst[i]);
-      }
-   }
-
-
-
-
-
+   int num_objs = 2;
+   double *rhs = (double*)malloc(sizeof(double) * num_objs);
    
-   // // Set the new RHS
-   // set_rhs(env_warm, rhs, m);
+   // First solve 
+   if ((termcode = sym_solve(env_warm)) < 0){
+      printf("WARM: PROBLEM INFEASIBLE!\n");
+   }
+   sym_build_dual_func(env_warm);
+   print_dual_function(env_warm);
+   sym_evaluate_dual_function(env_warm, rhs, 0, &dualFuncObj);
 
-   // // First solve 
-   // if ((termcode = sym_solve(env_warm)) < 0){
-   //    printf("WARM: PROBLEM INFEASIBLE!\n");
-   // }
 
-   // sym_get_obj_val(env_warm, &warmObjVal);
-   // printf("WARM OBJ : %.5f\n", warmObjVal);
-   // // print_tree(env_warm->warm_start->rootnode);
-   // sym_build_dual_func(env_warm);
+   printf("======================================\n");
+   rhs[0] = -2747.0;
+   rhs[1] = -3132.0;
 
-   // rhs[0] = 40.0/9.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
+   set_rhs(env_warm, rhs, num_objs);
+    
+   if ((termcode = sym_warm_solve(env_warm)) < 0){
+      printf("WARM: PROBLEM INFEASIBLE!\n");
+   }
 
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
+   if (sym_is_proven_optimal(env_warm)){
+      printf("  PROVEN OPTIMAL!\n");
+   } else if (sym_is_proven_primal_infeasible(env_warm)){
+      printf("  PROVEN INFEASIBLE!\n");
+   }
 
-   // rhs[0] = -55.5;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
+   sym_build_dual_func(env_warm);
+   print_dual_function(env_warm);
+   sym_evaluate_dual_function(env_warm, rhs, 2, &dualFuncObj);
 
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
+   printf("======================================\n");
+   rhs[0] = -2747.0;
+   rhs[1] = -2740.5;
 
-   // rhs[0] = -73.0/6.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
+   set_rhs(env_warm, rhs, num_objs);
+    
+   if ((termcode = sym_warm_solve(env_warm)) < 0){
+      printf("WARM: PROBLEM INFEASIBLE!\n");
+   }
 
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
+   if (sym_is_proven_optimal(env_warm)){
+      printf("  PROVEN OPTIMAL!\n");
+   } else if (sym_is_proven_primal_infeasible(env_warm)){
+      printf("  PROVEN INFEASIBLE!\n");
+   }
 
-   // rhs[0] = -10;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
+   sym_build_dual_func(env_warm);
+   print_dual_function(env_warm);
+   sym_evaluate_dual_function(env_warm, rhs, 2, &dualFuncObj);
 
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
+   printf("======================================\n");
+   rhs[0] = -2747.0;
+   rhs[1] = -2349.0;
+
+   set_rhs(env_warm, rhs, num_objs);
+    
+   if ((termcode = sym_warm_solve(env_warm)) < 0){
+      printf("WARM: PROBLEM INFEASIBLE!\n");
+   }
+
+   if (sym_is_proven_optimal(env_warm)){
+      printf("  PROVEN OPTIMAL!\n");
+   } else if (sym_is_proven_primal_infeasible(env_warm)){
+      printf("  PROVEN INFEASIBLE!\n");
+   }
+
+   sym_build_dual_func(env_warm);
+   print_dual_function(env_warm);
+   sym_evaluate_dual_function(env_warm, rhs, 2, &dualFuncObj);
+
+   printf("======================================\n");
+   rhs[0] = -2747.0;
+   rhs[1] = -1957.5;
+
+   set_rhs(env_warm, rhs, num_objs);
+    
+   if ((termcode = sym_warm_solve(env_warm)) < 0){
+      printf("WARM: PROBLEM INFEASIBLE!\n");
+   }
+
+   if (sym_is_proven_optimal(env_warm)){
+      printf("  PROVEN OPTIMAL!\n");
+   } else if (sym_is_proven_primal_infeasible(env_warm)){
+      printf("  PROVEN INFEASIBLE!\n");
+   }
+
+   sym_build_dual_func(env_warm);
+   print_dual_function(env_warm);
+   sym_evaluate_dual_function(env_warm, rhs, 2, &dualFuncObj);
+
+   printf("======================================\n");
+   rhs[0] = -2747.0;
+   rhs[1] = -1566.0;
+
+   set_rhs(env_warm, rhs, num_objs);
+    
+   if ((termcode = sym_warm_solve(env_warm)) < 0){
+      printf("WARM: PROBLEM INFEASIBLE!\n");
+   }
+
+   if (sym_is_proven_optimal(env_warm)){
+      printf("  PROVEN OPTIMAL!\n");
+   } else if (sym_is_proven_primal_infeasible(env_warm)){
+      printf("  PROVEN INFEASIBLE!\n");
+   }
+
+   sym_build_dual_func(env_warm);
+   print_dual_function(env_warm);
+   sym_evaluate_dual_function(env_warm, rhs, 2, &dualFuncObj);
 
    // // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
 
@@ -427,9 +379,9 @@ int main(int argc, char **argv)
    sym_close_environment(env_warm);
    sym_close_environment(env_cold);
 
-   free(zeta_lst);
-   free(rvf_lst);
-   free(df_lst);
+   // free(zeta_lst);
+   // free(rvf_lst);
+   // free(df_lst);
 
    return 0;
 }  

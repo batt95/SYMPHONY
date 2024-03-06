@@ -35,7 +35,7 @@
 // #include "sym_lp.h"
 #include "sym_tm.h"
 
-#define SENSITIVITY_ANALYSIS
+// #define DEBUG_DUAL_FUNC
 
 /*===========================================================================*/
 /*===========================================================================*/
@@ -499,7 +499,7 @@ int resolve_node(sym_environment *env, bc_node *node)
 		node->feasibility_status = INFEASIBLE_PRUNED;
 		node->node_status = NODE_STATUS__PRUNED;
 #ifdef SENSITIVITY_ANALYSIS
-		if (lp_data->raysol)
+		if (lp_data->has_ray)
 		{
 			if (!node->rays)
 			{
@@ -1526,12 +1526,12 @@ int copy_node(warm_start_desc *ws, bc_node *n_to, bc_node *n_from)
 			   ws->rootnode->desc.uind.size * DSIZE);
 	}
 
-	// if (n_from->rays)
-	// {
-	// 	n_to->rays = (double *)malloc(n_from->desc.uind.size * DSIZE);
-	// 	memcpy(n_to->rays, n_from->rays,
-	// 		   n_from->desc.uind.size * DSIZE);
-	// }
+	if (n_from->rays)
+	{
+		n_to->rays = (double *)malloc(n_from->desc.uind.size * DSIZE);
+		memcpy(n_to->rays, n_from->rays,
+			   n_from->desc.uind.size * DSIZE);
+	}
 #endif
 
 #ifdef TRACE_PATH
@@ -3694,6 +3694,9 @@ void free_master(sym_environment *env)
 				FREE(curr);             
 			}
 			FREE(env->warm_start->dual_func->hashtb);
+			if (env->warm_start->dual_func->si){
+				delete env->warm_start->dual_func->si;
+			} 
 			FREE(env->warm_start->dual_func);
 		}
 #endif
@@ -3736,7 +3739,7 @@ int get_num_leaf_nodes(bc_node *node, int *num_rays)
 	else if (!node->bobj.child_num)
 	{
 		// Count how many rays are there
-		if (node->rays){
+		if (node->feasibility_status == INFEASIBLE_PRUNED){
 			(*num_rays)++;
 		}
 		return 1;
@@ -3745,7 +3748,7 @@ int get_num_leaf_nodes(bc_node *node, int *num_rays)
 	{
 		int num_leaf_subtrees = 0;
 
-		if (node->rays){
+		if (node->feasibility_status == INFEASIBLE_PRUNED){
 			(*num_rays)++;
 		}
 
@@ -4052,55 +4055,6 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			}
 		}
 	}
-	// Must collect the ray
-	if (node->rays){
-
-		bool is_duplicate = false;
-		bool is_all_zero = true;
-		// Check that the ray is not all zeros
-		for (i = 0; i < ws->m + ws->n; i++)
-		{
-			if (fabs(node->rays[i]) > 1e-5){
-				is_all_zero = false;
-				break;
-			}
-		}
-
-		if (!is_all_zero){
-			// Check duplicates among current rays
-			for (int i = 0; i < (*curr_ray) && (!is_duplicate); i++){
-				for (int j = 0; j < ws->m + ws->n; j++){
-					if (fabs(node->rays[j] - rays[i][j]) > 1e-7){
-						// These rays are different, no need to check more
-						break;
-					}
-					if (j == ws->m + ws->n - 1)
-						// We already have this ray
-						is_duplicate = true;
-				}
-			}
-
-			// Check duplicates among rays in dual_func_desc
-			for (int i = 0; i < ws->dual_func->num_rays && (!is_duplicate); i++){
-				for (int j = 0; j < ws->m + ws->n; j++){
-					if (fabs(node->rays[j] - ws->dual_func->rays[i][j]) > 1e-7){
-						// These rays are different, no need to check more
-						break;
-					}
-					if (j == ws->m + ws->n - 1)
-						// We already have this ray
-						is_duplicate = true;
-				}
-			}
-
-			if (!is_duplicate){
-				// Allocate space for curr ray
-				rays[*curr_ray] = (double *)malloc(DSIZE * (ws->m + ws->n));
-				memcpy(rays[*curr_ray], node->rays, DSIZE * (ws->m + ws->n));
-				(*curr_ray)++;
-			}
-		}
-	}
 
 	// If this is a child, we have a term of the disjunction
 	if (!child_num)
@@ -4183,6 +4137,136 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 
 			ws->dual_func->disj[*curr_term] = disj;
 			(*curr_term)++;
+
+			// Must collect the ray
+			if ((node->feasibility_status == INFEASIBLE_PRUNED)){
+				if (!node->rays){
+					if (!ws->dual_func->si){
+						ws->dual_func->si = new OsiXSolverInterface();
+						ws->dual_func->si->setHintParam(OsiDoReducePrint);
+						ws->dual_func->si->messageHandler()->setLogLevel(0);
+						ws->dual_func->si->setHintParam(OsiDoScale,false,OsiHintDo);
+					}
+					ws->dual_func->si->loadProblem(ws->n, ws->m,
+							mip->matbeg, mip->matind,
+							mip->matval, lb,
+							ub, mip->obj,
+							mip->sense, mip->rhs,
+							mip->rngval);
+
+					ws->dual_func->si->initialSolve();
+
+					if (ws->dual_func->si->isProvenPrimalInfeasible()){
+						std::vector<double *> vRays = ws->dual_func->si->getDualRays(1, false);
+						// check that there is at least one ray
+						int raysReturned = static_cast<unsigned int>(vRays.size());
+						assert(raysReturned == 1);	
+						if (vRays[0])
+						{
+							double *ray = vRays[0];
+							int i;
+							bool is_ray_empty = TRUE;
+
+							const double *inverseRowScale = ws->dual_func->si->getModelPtr()->inverseRowScale();
+							const double *rowScale = ws->dual_func->si->getModelPtr()->rowScale();
+							double *rayA = (double *)malloc(sizeof(double) * ws->n);
+
+							const CoinPackedMatrix *A = ws->dual_func->si->getMatrixByCol();
+							double norm = 0;
+
+							for (i = 0; i < ws->m; i++)
+							{
+								if (fabs(ray[i]) > 1e-5){
+									is_ray_empty = FALSE;
+									break;
+								}
+							} 
+
+							if (!is_ray_empty)
+							{	
+								for (i = 0; i < ws->m; i++)
+								{
+									norm += ray[i] * ray[i];
+								}
+								norm = sqrt(norm);
+
+								if (norm > 1e-7){
+									for (i = 0; i < ws->m; i++)
+									{
+										ray[i] /= norm;
+									}
+								}
+									
+								A->transposeTimes(ray, rayA);
+								node->rays = (double *)malloc(sizeof(double) * (ws->n + ws->m));
+								memcpy(node->rays, ray, (ws->m) * DSIZE);
+								memcpy(node->rays + ws->m, rayA, (ws->n) * DSIZE);
+							} else {
+								assert(FALSE);
+							}
+							
+							delete[] vRays[0];
+							FREE(rayA);
+						}
+						else
+						{
+							assert(FALSE);
+						}
+
+					} else {
+						// This must never happen!
+						assert(FALSE);
+					}	
+				}
+				if (node->rays){
+					bool is_duplicate = false;
+					bool is_all_zero = true;
+					// Check that the ray is not all zeros
+					for (i = 0; i < ws->m + ws->n; i++)
+					{
+						if (fabs(node->rays[i]) > 1e-5){
+							is_all_zero = false;
+							break;
+						}
+					}
+
+					if (!is_all_zero){
+						// Check duplicates among current rays
+						for (int i = 0; i < (*curr_ray) && (!is_duplicate); i++){
+							for (int j = 0; j < ws->m + ws->n; j++){
+								if (fabs(node->rays[j] - rays[i][j]) > 1e-7){
+									// These rays are different, no need to check more
+									break;
+								}
+								if (j == ws->m + ws->n - 1)
+									// We already have this ray
+									is_duplicate = true;
+							}
+						}
+
+						// Check duplicates among rays in dual_func_desc
+						for (int i = 0; i < ws->dual_func->num_rays && (!is_duplicate); i++){
+							for (int j = 0; j < ws->m + ws->n; j++){
+								if (fabs(node->rays[j] - ws->dual_func->rays[i][j]) > 1e-7){
+									// These rays are different, no need to check more
+									break;
+								}
+								if (j == ws->m + ws->n - 1)
+									// We already have this ray
+									is_duplicate = true;
+							}
+						}
+
+						if (!is_duplicate){
+							// Allocate space for curr ray
+							rays[*curr_ray] = (double *)malloc(DSIZE * (ws->m + ws->n));
+							memcpy(rays[*curr_ray], node->rays, DSIZE * (ws->m + ws->n));
+							(*curr_ray)++;
+						}
+					}
+				}
+			}
+
 			FREE(lb);
 			FREE(ub);
 		}
@@ -4214,7 +4298,7 @@ int build_dual_func(sym_environment *env)
 	int num_rays = 0;
 	int num_leaf = get_num_leaf_nodes(ws->rootnode, &num_rays);
 
-	if (!ws->dual_func)
+ 	if (!ws->dual_func)
 	{
 		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
 		ws->dual_func->hashtb = NULL;
@@ -4383,7 +4467,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		printf("Warning: None or empty dual function in evaluate_dual_func()\n");
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
-#if 0
+#ifdef DEBUG_DUAL_FUNC
 	// For sanity check
 	double sanity_objVal = 0;
 	OsiXSolverInterface *si = new OsiXSolverInterface();
@@ -4544,7 +4628,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		}
 	}
 
-#if 0
+#ifdef DEBUG_DUAL_FUNC
 	// This is a sanity check if the rays prove primal infeasibility
 	si->setHintParam(OsiDoReducePrint);
     si->messageHandler()->setLogLevel(0);
@@ -4578,6 +4662,8 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			si->initialSolve();
 
 			if (si->isProvenPrimalInfeasible()){
+				std::vector<double *> vRays = si->getDualRays(1, false);
+				double *ray = vRays[0];
 				if (is_term_feas[t])
 					si->writeLp("proof_not_working", "lp");
 				assert(!is_term_feas[t]);
@@ -4614,7 +4700,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			idx = disj->ubvaridx[i];
 			ub[idx] = disj->ub[i];
 		}
-#if 0	
+#ifdef DEBUG_DUAL_FUNC
 		si->loadProblem(ws->n, ws->m,
 							mip->matbeg, mip->matind,
 							mip->matval, lb,
@@ -4684,11 +4770,11 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			}
 		}
 
-#if 0
+#ifdef DEBUG_DUAL_FUNC
 		// This assertion may fail since CLP might have stopped
 		// the solution of LPs prematurely due to the curr UB in the Tree
 		// but this is not a problem
-		assert(fabs(local_best_bound - sanity_objVal) <= 0.1);
+		// assert(fabs(local_best_bound - sanity_objVal) <= 0.1);
 #endif	
 		if (local_best_bound < global_best_bound - granularity){
 			global_best_bound = local_best_bound;
@@ -4708,7 +4794,7 @@ TERM_EVAL_DUAL_FUNC:
 	if (is_term_feas);	
 		FREE(is_term_feas);
 
-#if 0
+#ifdef DEBUG_DUAL_FUNC
 	delete si;
 #endif
 

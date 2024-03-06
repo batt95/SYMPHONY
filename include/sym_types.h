@@ -33,6 +33,8 @@
 // feb223
 #include "uthash/uthash.h"
 #include "CoinPackedMatrix.hpp"
+#include "OsiClpSolverInterface.hpp"
+
 
 typedef struct LP_SOL{
    int            lp;          /* the tid of the lp process asssociated with
@@ -962,6 +964,7 @@ typedef struct DUAL_FUNC_DESC{
    disjunction_desc   *disj;
    int                *feas_stati;
    int                 num_terms; 
+   OsiClpSolverInterface *si;
 }dual_func_desc;
 
 typedef struct WARM_START_DESC{
