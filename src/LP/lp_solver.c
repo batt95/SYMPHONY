@@ -3663,6 +3663,24 @@ void get_dj_pi(LPdata *lp_data)
          dj[t] = value;
       }
    }
+   // double *my_djs = (double *)malloc(sizeof(double) * lp_data->n);
+   // for (t = 0; t < numberColumns; t++)
+   // {
+   //       int k;
+   //       double value = objective[t];
+   //       for (k = columnStart[t]; k < columnStart[t] + columnLength[t]; k++)
+   //       {
+   //          int iRow = row[k];
+   //          value -= elementByColumn[k] * pi[iRow];
+   //       }
+   //       dj[t] = value;
+   // }
+   // double *my_pi  = (double *)malloc(sizeof(double) * lp_data->m);
+   // 
+   // memcpy(my_pi, lp_data->si->getRowPrice(), lp_data->m * DSIZE);
+   // memcpy(my_djs, objective, lp_data->n * DSIZE);
+   // matrix->
+   // FREE(my_djs);
 }
 
 /*===========================================================================*/

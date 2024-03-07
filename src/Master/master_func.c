@@ -35,7 +35,7 @@
 // #include "sym_lp.h"
 #include "sym_tm.h"
 
-// #define DEBUG_DUAL_FUNC
+#define DEBUG_DUAL_FUNC
 
 /*===========================================================================*/
 /*===========================================================================*/
@@ -3963,7 +3963,7 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 		printf("Warning: NULL pointer in get_leaf_node_data()\n");
 		return;
 	}
-
+	const CoinPackedMatrix *A;
 	// if (!node->parent) count_leaf = 0;
 
 	int i, j, k, l;
@@ -4003,12 +4003,12 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 		node->feasibility_status == OVER_UB_PRUNED ||
 		node->feasibility_status == NODE_BRANCHED_ON 
 		){
-		if (node->duals && node->dj && 
+		if (node->duals && node->dj && (!node->rays) &&
 		((ws->dual_func->policy == DUALS_SAVE_ALL) ||
 		 (ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
 		{
 			dual = NULL;
-			if (node->basis_idx && (node->basis_len > 0) && node->basis_len == mip->m){
+			if (node->basis_idx && (node->basis_len > 0)){
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
@@ -4171,7 +4171,8 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 							const double *rowScale = ws->dual_func->si->getModelPtr()->rowScale();
 							double *rayA = (double *)malloc(sizeof(double) * ws->n);
 
-							const CoinPackedMatrix *A = ws->dual_func->si->getMatrixByCol();
+							A = ws->dual_func->si->getMatrixByCol();
+							
 							double norm = 0;
 
 							for (i = 0; i < ws->m; i++)
@@ -4586,47 +4587,47 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	is_term_feas = (bool *)malloc(ws->dual_func->num_terms * sizeof(bool));
 	CoinFillN(is_term_feas, ws->dual_func->num_terms, true);
 	
-	if (ws->dual_func->num_rays > 0){
-		for (int t = 0; t < ws->dual_func->num_terms; t++){
+	// if (ws->dual_func->num_rays > 0){
+	// 	for (int t = 0; t < ws->dual_func->num_terms; t++){
 
-			memcpy(lb, mip->lb, ws->n * sizeof(double));
-			memcpy(ub, mip->ub, ws->n * sizeof(double));
-			disj = ws->dual_func->disj + t;
+	// 		memcpy(lb, mip->lb, ws->n * sizeof(double));
+	// 		memcpy(ub, mip->ub, ws->n * sizeof(double));
+	// 		disj = ws->dual_func->disj + t;
 
-			for (int i = 0; i < disj->lblen; i++){
-				idx = disj->lbvaridx[i];
-				lb[idx] = disj->lb[i];
-			}
+	// 		for (int i = 0; i < disj->lblen; i++){
+	// 			idx = disj->lbvaridx[i];
+	// 			lb[idx] = disj->lb[i];
+	// 		}
 
-			for (int i = 0; i < disj->ublen; i++){
-				idx = disj->ubvaridx[i];
-				ub[idx] = disj->ub[i];
-			}
+	// 		for (int i = 0; i < disj->ublen; i++){
+	// 			idx = disj->ubvaridx[i];
+	// 			ub[idx] = disj->ub[i];
+	// 		}
 
-			for (int r = 0; (r < ws->dual_func->num_rays) && (is_term_feas[t]); r++){
-				ray_times_b = 0;
-				ray = ws->dual_func->rays[r];
-				for (int i = 0; i < ws->m; i++){
-					ray_times_b -= ray[i] * rhs[i];
-				}
+	// 		for (int r = 0; (r < ws->dual_func->num_rays) && (is_term_feas[t]); r++){
+	// 			ray_times_b = 0;
+	// 			ray = ws->dual_func->rays[r];
+	// 			for (int i = 0; i < ws->m; i++){
+	// 				ray_times_b -= ray[i] * rhs[i];
+	// 			}
 
-				for (int i = ws->m; i < ws->m + ws->n; i++){
-					if (ray[i] > zerotol){
-						ray_times_b += ray[i] * lb[i - ws->m];
-					} 
-					else if (ray[i] < -zerotol){
-						ray_times_b += ray[i] * ub[i - ws->m];
-					}
-				}
+	// 			for (int i = ws->m; i < ws->m + ws->n; i++){
+	// 				if (ray[i] > zerotol){
+	// 					ray_times_b += ray[i] * lb[i - ws->m];
+	// 				} 
+	// 				else if (ray[i] < -zerotol){
+	// 					ray_times_b += ray[i] * ub[i - ws->m];
+	// 				}
+	// 			}
 
-				if (ray_times_b > zerotol){
-					// This term of the disjunction is infeasible for this rhs
-					// and should not be considered
-					is_term_feas[t] = false;
-				}
-			}
-		}
-	}
+	// 			if (ray_times_b > zerotol){
+	// 				// This term of the disjunction is infeasible for this rhs
+	// 				// and should not be considered
+	// 				is_term_feas[t] = false;
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 #ifdef DEBUG_DUAL_FUNC
 	// This is a sanity check if the rays prove primal infeasibility
@@ -4662,15 +4663,20 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			si->initialSolve();
 
 			if (si->isProvenPrimalInfeasible()){
-				std::vector<double *> vRays = si->getDualRays(1, false);
-				double *ray = vRays[0];
-				if (is_term_feas[t])
-					si->writeLp("proof_not_working", "lp");
-				assert(!is_term_feas[t]);
-			} else {
-				if (!is_term_feas[t])
-					si->writeLp("proof_not_working", "lp");
-				assert(is_term_feas[t]);
+				is_term_feas[t] = FALSE;
+				// if (is_term_feas[t])
+				// 	si->writeLp("proof_not_working", "lp");
+				// assert(!is_term_feas[t]);
+			} else if (si->isProvenOptimal()){
+				is_term_feas[t] = TRUE;
+				// sanity_objVal = si->getObjValue();
+				// if (sanity_objVal == -2663.00){
+				// 	printf("HERE\n");
+				// 	if (!is_term_feas[t])
+				// 		si->writeLp("proof_not_working", "lp");
+					// assert(is_term_feas[t]);
+				// }
+				
 			}
 		}
 	}
