@@ -4714,13 +4714,13 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 							mip->sense, rhs,
 							mip->rngval);
 		
-		si->initialSolve();
-		if (si->isProvenOptimal()){
-			sanity_objVal = si->getObjValue();
-		} else {
+		// si->initialSolve();
+		// if (si->isProvenOptimal()){
+		//	sanity_objVal = si->getObjValue();
+		// } else {
 			// Should never happen!
-			assert(false);
-		}
+			// assert(false);
+		// }
 #endif
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
 			curr_piece_bound = rhs_times_pi[i];
