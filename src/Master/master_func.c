@@ -4007,6 +4007,14 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 		((ws->dual_func->policy == DUALS_SAVE_ALL) ||
 		 (ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
 		{
+			// for (int i = 0; i < node->basis_len; i++){
+			// printf("%d ", node->basis_idx[i]);
+			// }
+			// printf(" | ");
+			// for (int i = 0; i < ws->m; i++){
+			// 	printf("%.5f ", node->duals[i]);
+			// }
+			// printf("\n------------\n");
 			dual = NULL;
 			if (node->basis_idx && (node->basis_len > 0)){
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
@@ -4141,8 +4149,13 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			// Must collect the ray
 			if ((node->feasibility_status == INFEASIBLE_PRUNED)){
 				if (!node->rays){
+					// This should never happen now, but if it does, resolve the LP
+					// and get the ray
+					printf(" WARNING in collect_duals():\n");
+					printf(" Infeasible node without rays!\n");
 					if (!ws->dual_func->si){
 						ws->dual_func->si = new OsiXSolverInterface();
+						ws->dual_func->si->setupForRepeatedUse();
 						ws->dual_func->si->setHintParam(OsiDoReducePrint);
 						ws->dual_func->si->messageHandler()->setLogLevel(0);
 						ws->dual_func->si->setHintParam(OsiDoScale,false,OsiHintDo);
@@ -4468,6 +4481,12 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		printf("Warning: None or empty dual function in evaluate_dual_func()\n");
 		return (FUNCTION_TERMINATED_ABNORMALLY);
 	}
+
+	if (ws->dual_func->num_pieces == 0){
+		*dual_bound = -SYM_INFINITY;
+		return (FUNCTION_TERMINATED_NORMALLY);
+	}
+
 #ifdef DEBUG_DUAL_FUNC
 	// For sanity check
 	double sanity_objVal = 0;
@@ -4672,9 +4691,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				// sanity_objVal = si->getObjValue();
 				// if (sanity_objVal == -2663.00){
 				// 	printf("HERE\n");
-				// 	if (!is_term_feas[t])
-				// 		si->writeLp("proof_not_working", "lp");
-					// assert(is_term_feas[t]);
+				// if (!is_term_feas[t]){
+				// 	si->writeLp("proof_not_working", "lp");
+				// 	assert(is_term_feas[t]);
 				// }
 				
 			}
@@ -4714,13 +4733,13 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 							mip->sense, rhs,
 							mip->rngval);
 		
-		// si->initialSolve();
-		// if (si->isProvenOptimal()){
-		//	sanity_objVal = si->getObjValue();
-		// } else {
+		si->initialSolve();
+		if (si->isProvenOptimal()){
+			sanity_objVal = si->getObjValue();
+		} else {
 			// Should never happen!
-			// assert(false);
-		// }
+			assert(false);
+		}
 #endif
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
 			curr_piece_bound = rhs_times_pi[i];

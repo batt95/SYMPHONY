@@ -2640,6 +2640,11 @@ void open_lp_solver(LPdata *lp_data)
    lp_data->si->messageHandler()->setLogLevel(0);
 #ifdef __OSI_CLP__
    lp_data->si->setupForRepeatedUse();
+   int options = lp_data->si->getModelPtr()->specialOptions();
+   // feb223
+   // For some reason OsiClp thinks its default is in branch and bound
+   // This option makes CLP creating ray while doing dual simplex
+   lp_data->si->getModelPtr()->setSpecialOptions((options|32));
    // lp_data->si->setupForRepeatedUse(3,0);
    // lp_data->si->getModelPtr()->setFactorizationFrequency(200);
    // lp_data->si->getModelPtr()->setSparseFactorization(true);
@@ -3039,17 +3044,29 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
 
       assert(len == lp_data->m);
 
+      // if (term == LP_OPTIMAL){
+      //    for (int i = 0; i < lp_data->basis_len; i++){
+      //    printf("%d ", lp_data->basis_idx[i]);
+      //    }
+      //    printf(" | ");
+      //    for (int i = 0; i < lp_data->maxm; i++){
+      //       printf("%.5f ", lp_data->dualsol[i]);
+      //    }
+      //    printf("\n");
+      //    printf("CSTAT: ");
+      //    for (int i = 0; i < lp_data->n; i++){
+      //       printf("%d ", cstat[i]);
+      //    }
+      //    printf("\n");
+      //    printf("RSTAT: ");
+      //    for (int i = 0; i < lp_data->m; i++){
+      //       printf("%d ", rstat[i]);
+      //    }
+      //    printf("\n------------\n");
+      // }
       FREE(cstat);
       FREE(rstat);
-
-      // for (int i = 0; i < lp_data->basis_len; i++){
-      //    printf("%d ", lp_data->basis_idx[i]);
-      // }
-      // printf(" | ");
-      // for (int i = 0; i < lp_data->maxm; i++){
-      //    printf("%.5f ", lp_data->dualsol[i]);
-      // }
-      // printf("\n");
+      
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3082,10 +3099,10 @@ int dual_simplex(LPdata *lp_data, int *iterd)
    int term = 0;
    OsiXSolverInterface *si = lp_data->si;
 #ifdef __OSI_CLP__
-   int sp = si->specialOptions();
+   int sp = si->getModelPtr()->specialOptions();
    if ((sp & 2) != 0)
       sp ^= 2;
-   si->setSpecialOptions(sp);
+   si->getModelPtr()->setSpecialOptions(sp);
    // si->setSpecialOptions(0x80000000);
    si->getModelPtr()->setPerturbation(50);
    // si->getModelPtr()->setFactorizationFrequency(150);
@@ -3226,19 +3243,31 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       //    write_lp(lp_data, "wrong_basis_len");
       //    assert(false);
       // }
+
+      // if (term == LP_OPTIMAL){
+      //    for (int i = 0; i < lp_data->basis_len; i++){
+      //    printf("%d ", lp_data->basis_idx[i]);
+      //    }
+      //    printf(" | ");
+      //    for (int i = 0; i < lp_data->maxm; i++){
+      //       printf("%.5f ", lp_data->dualsol[i]);
+      //    }
+      //    printf("\n");
+      //    printf("CSTAT: ");
+      //    for (int i = 0; i < lp_data->n; i++){
+      //       printf("%d ", cstat[i]);
+      //    }
+      //    printf("\n");
+      //    printf("RSTAT: ");
+      //    for (int i = 0; i < lp_data->m; i++){
+      //       printf("%d ", rstat[i]);
+      //    }
+      //    printf("\n------------\n");
+      // }
       
 
       FREE(cstat);
       FREE(rstat);
-
-      // for (int i = 0; i < lp_data->basis_len; i++){
-      //    printf("%d ", lp_data->basis_idx[i]);
-      // }
-      // printf(" | ");
-      // for (int i = 0; i < lp_data->maxm; i++){
-      //    printf("%.5f ", lp_data->dualsol[i]);
-      // }
-      // printf("\n");
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3689,9 +3718,9 @@ void get_dj_pi(LPdata *lp_data)
 void get_dual_ray(LPdata *lp_data)
 {
    std::vector<double *> vRays;
-   // vRays = lp_data->si->getDualRays(1, true);
+   vRays = lp_data->si->getDualRays(1, true);
    
-   vRays = lp_data->si->getDualRays(1, false);
+   // vRays = lp_data->si->getDualRays(1, false);
 
    // check that there is at least one ray
    int raysReturned = static_cast<unsigned int>(vRays.size());
@@ -3705,7 +3734,9 @@ void get_dual_ray(LPdata *lp_data)
       double *ray = vRays[0];
       int i;
       bool is_ray_empty = TRUE;
-
+      // if (ray[1] < -1e-5){
+      //    printf("here\n");
+      // }
       const double *inverseRowScale = lp_data->si->getModelPtr()->inverseRowScale();
       const double *rowScale = lp_data->si->getModelPtr()->rowScale();
       double *rayA = (double *)malloc(sizeof(double) * lp_data->n);
@@ -3714,13 +3745,13 @@ void get_dual_ray(LPdata *lp_data)
       // A->dumpMatrix();
       double norm = 0;
 
-      for (i = 0; i < lp_data->m; i++)
-      {
-         if (fabs(ray[i]) > 1e-5){
-            is_ray_empty = FALSE;
-            break;
-         }
-      } 
+      // for (i = 0; i < lp_data->m; i++)
+      // {
+      //    if (fabs(ray[i]) > 1e-5){
+      //       is_ray_empty = FALSE;
+      //       break;
+      //    }
+      // } 
 
       // if (is_ray_empty){
       //    printf("RAY IS EMPTY!\n");
@@ -3756,6 +3787,11 @@ void get_dual_ray(LPdata *lp_data)
       memcpy(lp_data->raysol + lp_data->m, rayA, (lp_data->n) * DSIZE);
 
       lp_data->has_ray = TRUE;
+
+      // if (ray[1] == -1.00){
+      //    printf("here\n");
+      //    lp_data->si->writeLp("strange_ray", "lp");
+      // }
       
       delete[] vRays[0];
       FREE(rayA);
