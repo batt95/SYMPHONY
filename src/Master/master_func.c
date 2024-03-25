@@ -4321,7 +4321,7 @@ int build_dual_func(sym_environment *env)
 
  	if (!ws->dual_func)
 	{
-		ws->dual_func = (dual_func_desc *)malloc(sizeof(dual_func_desc));
+		ws->dual_func = (dual_func_desc *)calloc(1, sizeof(dual_func_desc));
 		ws->dual_func->hashtb = NULL;
 		ws->dual_func->duals  = NULL;
 		ws->dual_func->num_pieces = 0;
