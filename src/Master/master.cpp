@@ -6852,6 +6852,14 @@ SYMPHONYLIB_EXPORT int sym_evaluate_dual_function(sym_environment *env,
                                           size_new_rhs, dual_bound);
 }
 
+SYMPHONYLIB_EXPORT double sym_get_lp_time_dual_func(sym_environment *env) {
+   if (env->warm_start && env->warm_start->dual_func){
+      return env->warm_start->dual_func->lp_cpu_time;
+   } else {
+      return 0.0;
+   }
+}
+
 /*===========================================================================*/
 /*===========================================================================*/
 
