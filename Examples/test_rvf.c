@@ -93,6 +93,7 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "do_reduced_cost_fixing", FALSE);
    sym_set_int_param(env_warm, "generate_cgl_cuts", FALSE);
    sym_set_int_param(env_warm, "max_active_nodes", 1);
+   sym_set_int_param(env_warm, "max_presolve_iter", 0);
 
    sym_set_int_param(env_cold, "keep_warm_start", TRUE);
    sym_set_int_param(env_cold, "keep_dual_function_description", TRUE);
@@ -143,6 +144,7 @@ int main(int argc, char **argv)
    sym_build_dual_func(env_warm);
    // print_dual_function(env_warm);
    sym_evaluate_dual_function(env_warm, rhs, 0, &dualFuncObj);
+   print_dual_function(env_warm);
 
    if (sym_is_proven_optimal(env_warm)){
       sym_get_obj_val(env_warm, &warmObjVal);
@@ -181,6 +183,7 @@ int main(int argc, char **argv)
       sym_build_dual_func(env_warm);
       // print_dual_function(env_warm);
       sym_evaluate_dual_function(env_warm, rhs, 2, &dualFuncObj);
+      print_dual_function(env_warm);
 
       set_rhs(env_cold, rhs, num_objs);
       if ((termcode = sym_solve(env_cold)) < 0){
@@ -194,6 +197,7 @@ int main(int argc, char **argv)
          if (fabs(dualFuncObj - warmObjVal) >= 1e-5){
             print_dual_function(env_warm);
             sym_evaluate_dual_function(env_warm, rhs, 2, &dualFuncObj);
+            print_dual_function(env_warm);
          }
          assert((fabs(dualFuncObj - warmObjVal) < 1e-5));
       } else if (sym_is_proven_primal_infeasible(env_cold)) {

@@ -3813,107 +3813,108 @@ void print_dual_function(warm_start_desc *ws)
 	printf("Num rays: %d\n", ws->dual_func->num_rays);
 	printf("Num dual sol: %d\n", ws->dual_func->num_pieces);
 	printf("Num terms: %d\n", ws->dual_func->num_terms);
+	printf("CPU Time spent in LPs: %.5f\n", ws->dual_func->lp_cpu_time);
 
-	printf("==========================\n");
-	printf("RAYS\n");
-	printf("==========================\n");
-	if (ws->dual_func->num_rays == 0){
-		printf("No rays!");
-		printf("\n------------------------\n");
-	} else {
-		for (int i = 0; i < ws->dual_func->num_rays; i++){
-			for (int j = 0; j < ws->m + ws->n; j++){
-				printf("%.10f ", ws->dual_func->rays[i][j]);
-			}
-			printf("\n------------------------\n");
-		}
-	}
+	// printf("==========================\n");
+	// printf("RAYS\n");
+	// printf("==========================\n");
+	// if (ws->dual_func->num_rays == 0){
+	// 	printf("No rays!");
+	// 	printf("\n------------------------\n");
+	// } else {
+	// 	for (int i = 0; i < ws->dual_func->num_rays; i++){
+	// 		for (int j = 0; j < ws->m + ws->n; j++){
+	// 			printf("%.10f ", ws->dual_func->rays[i][j]);
+	// 		}
+	// 		printf("\n------------------------\n");
+	// 	}
+	// }
 
-	CoinPackedMatrix *duals = ws->dual_func->duals;
-	printf("===============================\n");
-	printf("DUAL SOLUTIONS + REDUCED COSTS \n");
-	printf("===============================\n");
+	// CoinPackedMatrix *duals = ws->dual_func->duals;
+	// printf("===============================\n");
+	// printf("DUAL SOLUTIONS + REDUCED COSTS \n");
+	// printf("===============================\n");
 
-    const double* elem = duals->getElements();
-    const int* indices = duals->getIndices();
+    // const double* elem = duals->getElements();
+    // const int* indices = duals->getIndices();
 
-	int major = duals->getMajorDim();
-	int minor = duals->getMinorDim();
-	int num_elem = duals->getNumElements();
-	int peppe = duals->getVectorLast(0);
-	int ord = duals->isColOrdered();
-	if (major == 0){
-		printf("No Dual Solutions!");
-		printf("\n------------------------\n");
-	} else {
-		for (int i = 0; i < major; i++){
-			const CoinBigIndex last = duals->getVectorLast(i);
-			for (CoinBigIndex j = duals->getVectorFirst(i); j < last; ++j){
-				// printf("%d, %d - %d \n", j, last, indices[j]);
-				printf("%d : %.10f, ", indices[j] < ws->m ? indices[j] : indices[j] /*- ws->m*/, elem[j]);
-			}
-			printf("\n------------------------\n");
-   		}
-	}
+	// int major = duals->getMajorDim();
+	// int minor = duals->getMinorDim();
+	// int num_elem = duals->getNumElements();
+	// int peppe = duals->getVectorLast(0);
+	// int ord = duals->isColOrdered();
+	// if (major == 0){
+	// 	printf("No Dual Solutions!");
+	// 	printf("\n------------------------\n");
+	// } else {
+	// 	for (int i = 0; i < major; i++){
+	// 		const CoinBigIndex last = duals->getVectorLast(i);
+	// 		for (CoinBigIndex j = duals->getVectorFirst(i); j < last; ++j){
+	// 			// printf("%d, %d - %d \n", j, last, indices[j]);
+	// 			printf("%d : %.10f, ", indices[j] < ws->m ? indices[j] : indices[j] /*- ws->m*/, elem[j]);
+	// 		}
+	// 		printf("\n------------------------\n");
+   	// 	}
+	// }
     
 	
-	printf("==========================\n");
-	printf("DISJUNCTION\n");
-	printf("==========================\n");
-	if (ws->dual_func->num_terms == 0){
-		printf("Only root node in the B&B Tree!\n");
-		printf("Feasibility Status: ");
-			switch (ws->rootnode->feasibility_status)
-			{
-			case ROOT_NODE:
-				printf("ROOT_NODE\n");
-				break;
+	// printf("==========================\n");
+	// printf("DISJUNCTION\n");
+	// printf("==========================\n");
+	// if (ws->dual_func->num_terms == 0){
+	// 	printf("Only root node in the B&B Tree!\n");
+	// 	printf("Feasibility Status: ");
+	// 		switch (ws->rootnode->feasibility_status)
+	// 		{
+	// 		case ROOT_NODE:
+	// 			printf("ROOT_NODE\n");
+	// 			break;
 			
-			case INFEASIBLE_PRUNED:
-				printf("INFEASIBLE_PRUNED\n");
-				break;
+	// 		case INFEASIBLE_PRUNED:
+	// 			printf("INFEASIBLE_PRUNED\n");
+	// 			break;
 			
-			case FEASIBLE_PRUNED:
-				printf("FEASIBLE_PRUNED\n");
-				break;
+	// 		case FEASIBLE_PRUNED:
+	// 			printf("FEASIBLE_PRUNED\n");
+	// 			break;
 
-			case OVER_UB_PRUNED:
-				printf("OVER_UB_PRUNED\n");
-				break;
+	// 		case OVER_UB_PRUNED:
+	// 			printf("OVER_UB_PRUNED\n");
+	// 			break;
 			
-			default:
-				printf("UNKNOWN\n");
-				break;
-			}
-	} else {
-		for (int i = 0; i < ws->dual_func->num_terms; i++)
-		{
-			printf("Feasibility Status: ");
-			switch (ws->dual_func->feas_stati[i])
-			{
-			case ROOT_NODE:
-				printf("ROOT_NODE\n");
-				break;
+	// 		default:
+	// 			printf("UNKNOWN\n");
+	// 			break;
+	// 		}
+	// } else {
+	// 	for (int i = 0; i < ws->dual_func->num_terms; i++)
+	// 	{
+	// 		printf("Feasibility Status: ");
+	// 		switch (ws->dual_func->feas_stati[i])
+	// 		{
+	// 		case ROOT_NODE:
+	// 			printf("ROOT_NODE\n");
+	// 			break;
 			
-			case INFEASIBLE_PRUNED:
-				printf("INFEASIBLE_PRUNED\n");
-				break;
+	// 		case INFEASIBLE_PRUNED:
+	// 			printf("INFEASIBLE_PRUNED\n");
+	// 			break;
 			
-			case FEASIBLE_PRUNED:
-				printf("FEASIBLE_PRUNED\n");
-				break;
+	// 		case FEASIBLE_PRUNED:
+	// 			printf("FEASIBLE_PRUNED\n");
+	// 			break;
 
-			case OVER_UB_PRUNED:
-				printf("OVER_UB_PRUNED\n");
-				break;
+	// 		case OVER_UB_PRUNED:
+	// 			printf("OVER_UB_PRUNED\n");
+	// 			break;
 			
-			default:
-				printf("UNKNOWN\n");
-				break;
-			}
-			printDisjunction(ws->dual_func->disj[i]);
-		}
-	}
+	// 		default:
+	// 			printf("UNKNOWN\n");
+	// 			break;
+	// 		}
+	// 		printDisjunction(ws->dual_func->disj[i]);
+	// 	}
+	// }
 	
 
 	// printf("==========================\n");
@@ -4151,14 +4152,17 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				if (!node->rays){
 					// This should never happen now, but if it does, resolve the LP
 					// and get the ray
-					printf(" WARNING in collect_duals():\n");
-					printf(" Infeasible node without rays!\n");
+					// printf(" WARNING in collect_duals():\n");
+					// printf(" Infeasible node without rays!\n");
+					clock_t start, end;
+					double cpu_time_used;
+					start = clock();
 					if (!ws->dual_func->si){
 						ws->dual_func->si = new OsiXSolverInterface();
 						ws->dual_func->si->setupForRepeatedUse();
 						ws->dual_func->si->setHintParam(OsiDoReducePrint);
 						ws->dual_func->si->messageHandler()->setLogLevel(0);
-						ws->dual_func->si->setHintParam(OsiDoScale,false,OsiHintDo);
+						ws->dual_func->si->setCleanupScaling(1);
 					}
 					ws->dual_func->si->loadProblem(ws->n, ws->m,
 							mip->matbeg, mip->matind,
@@ -4216,7 +4220,7 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 								memcpy(node->rays, ray, (ws->m) * DSIZE);
 								memcpy(node->rays + ws->m, rayA, (ws->n) * DSIZE);
 							} else {
-								assert(FALSE);
+								// assert(FALSE);
 							}
 							
 							delete[] vRays[0];
@@ -4224,13 +4228,16 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 						}
 						else
 						{
-							assert(FALSE);
+							// assert(FALSE);
 						}
 
 					} else {
 						// This must never happen!
-						assert(FALSE);
+						// assert(FALSE);
 					}	
+					end = clock();
+					cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+					ws->dual_func->lp_cpu_time += cpu_time_used;
 				}
 				if (node->rays){
 					bool is_duplicate = false;
@@ -4490,7 +4497,15 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 #ifdef DEBUG_DUAL_FUNC
 	// For sanity check
 	double sanity_objVal = 0;
-	OsiXSolverInterface *si = new OsiXSolverInterface();
+	OsiXSolverInterface *si;
+	if (!ws->dual_func->si){
+		ws->dual_func->si = new OsiXSolverInterface();
+		ws->dual_func->si->setupForRepeatedUse();
+		ws->dual_func->si->setHintParam(OsiDoReducePrint);
+		ws->dual_func->si->messageHandler()->setLogLevel(0);
+		ws->dual_func->si->setCleanupScaling(1);
+	} 
+	si = ws->dual_func->si;
 #endif
 
 	// Build the new rhs to be of the correct size, ws->m
@@ -4606,56 +4621,54 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	is_term_feas = (bool *)malloc(ws->dual_func->num_terms * sizeof(bool));
 	CoinFillN(is_term_feas, ws->dual_func->num_terms, true);
 	
-	// if (ws->dual_func->num_rays > 0){
-	// 	for (int t = 0; t < ws->dual_func->num_terms; t++){
+	if (ws->dual_func->num_rays > 0){
+		for (int t = 0; t < ws->dual_func->num_terms; t++){
 
-	// 		memcpy(lb, mip->lb, ws->n * sizeof(double));
-	// 		memcpy(ub, mip->ub, ws->n * sizeof(double));
-	// 		disj = ws->dual_func->disj + t;
+			memcpy(lb, mip->lb, ws->n * sizeof(double));
+			memcpy(ub, mip->ub, ws->n * sizeof(double));
+			disj = ws->dual_func->disj + t;
 
-	// 		for (int i = 0; i < disj->lblen; i++){
-	// 			idx = disj->lbvaridx[i];
-	// 			lb[idx] = disj->lb[i];
-	// 		}
+			for (int i = 0; i < disj->lblen; i++){
+				idx = disj->lbvaridx[i];
+				lb[idx] = disj->lb[i];
+			}
 
-	// 		for (int i = 0; i < disj->ublen; i++){
-	// 			idx = disj->ubvaridx[i];
-	// 			ub[idx] = disj->ub[i];
-	// 		}
+			for (int i = 0; i < disj->ublen; i++){
+				idx = disj->ubvaridx[i];
+				ub[idx] = disj->ub[i];
+			}
 
-	// 		for (int r = 0; (r < ws->dual_func->num_rays) && (is_term_feas[t]); r++){
-	// 			ray_times_b = 0;
-	// 			ray = ws->dual_func->rays[r];
-	// 			for (int i = 0; i < ws->m; i++){
-	// 				ray_times_b -= ray[i] * rhs[i];
-	// 			}
+			for (int r = 0; (r < ws->dual_func->num_rays) && (is_term_feas[t]); r++){
+				ray_times_b = 0;
+				ray = ws->dual_func->rays[r];
+				for (int i = 0; i < ws->m; i++){
+					ray_times_b -= ray[i] * rhs[i];
+				}
 
-	// 			for (int i = ws->m; i < ws->m + ws->n; i++){
-	// 				if (ray[i] > zerotol){
-	// 					ray_times_b += ray[i] * lb[i - ws->m];
-	// 				} 
-	// 				else if (ray[i] < -zerotol){
-	// 					ray_times_b += ray[i] * ub[i - ws->m];
-	// 				}
-	// 			}
+				for (int i = ws->m; i < ws->m + ws->n; i++){
+					if (ray[i] > zerotol){
+						ray_times_b += ray[i] * lb[i - ws->m];
+					} 
+					else if (ray[i] < -zerotol){
+						ray_times_b += ray[i] * ub[i - ws->m];
+					}
+				}
 
-	// 			if (ray_times_b > zerotol){
-	// 				// This term of the disjunction is infeasible for this rhs
-	// 				// and should not be considered
-	// 				is_term_feas[t] = false;
-	// 			}
-	// 		}
-	// 	}
-	// }
+				if (ray_times_b > zerotol){
+					// This term of the disjunction is infeasible for this rhs
+					// and should not be considered
+					is_term_feas[t] = false;
+				}
+			}
+		}
+	}
 
 #ifdef DEBUG_DUAL_FUNC
 	// This is a sanity check if the rays prove primal infeasibility
-	si->setHintParam(OsiDoReducePrint);
-    si->messageHandler()->setLogLevel(0);
-	/* Turn off scaling for CLP */
-    si->setHintParam(OsiDoScale,false,OsiHintDo);
-
 	if (ws->dual_func->num_rays > 0){
+		clock_t start, end;
+		double cpu_time_used;
+		start = clock();
 		for (int t = 0; t < ws->dual_func->num_terms; t++){
 
 			memcpy(lb, mip->lb, ws->n * sizeof(double));
@@ -4698,6 +4711,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				
 			}
 		}
+		end = clock();
+		cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+		ws->dual_func->lp_cpu_time += cpu_time_used;
 	}
 
 #endif
@@ -4726,20 +4742,20 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			ub[idx] = disj->ub[i];
 		}
 #ifdef DEBUG_DUAL_FUNC
-		si->loadProblem(ws->n, ws->m,
-							mip->matbeg, mip->matind,
-							mip->matval, lb,
-							ub, mip->obj,
-							mip->sense, rhs,
-							mip->rngval);
+		// si->loadProblem(ws->n, ws->m,
+		// 					mip->matbeg, mip->matind,
+		// 					mip->matval, lb,
+		// 					ub, mip->obj,
+		// 					mip->sense, rhs,
+		// 					mip->rngval);
 		
-		si->initialSolve();
-		if (si->isProvenOptimal()){
-			sanity_objVal = si->getObjValue();
-		} else {
-			// Should never happen!
-			assert(false);
-		}
+		// si->initialSolve();
+		// if (si->isProvenOptimal()){
+		// 	sanity_objVal = si->getObjValue();
+		// } else {
+		// 	// Should never happen!
+		// 	assert(false);
+		// }
 #endif
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
 			curr_piece_bound = rhs_times_pi[i];
@@ -4819,9 +4835,6 @@ TERM_EVAL_DUAL_FUNC:
 	if (is_term_feas);	
 		FREE(is_term_feas);
 
-#ifdef DEBUG_DUAL_FUNC
-	delete si;
-#endif
 
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else

@@ -93,6 +93,7 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "do_reduced_cost_fixing", FALSE);
    sym_set_int_param(env_warm, "generate_cgl_cuts", FALSE);
    sym_set_int_param(env_warm, "max_active_nodes", 1);
+   sym_set_int_param(env_warm, "max_presolve_iter", 0);
 
    sym_set_int_param(env_cold, "keep_warm_start", TRUE);
    sym_set_int_param(env_cold, "keep_dual_function_description", TRUE);
@@ -114,15 +115,15 @@ int main(int argc, char **argv)
    int num_objs = 1;
    double *rhs = (double*)malloc(sizeof(double) * num_objs);
    
-   sym_write_lp(env_warm, "pippo");
+   
    // First solve 
    if ((termcode = sym_solve(env_warm)) < 0){
       printf("WARM: PROBLEM INFEASIBLE!\n");
    }
    
    sym_build_dual_func(env_warm);
-   print_dual_function(env_warm);
    sym_evaluate_dual_function(env_warm, rhs, 0, &dualFuncObj);
+   print_dual_function(env_warm);
    sym_get_obj_val(env_warm, &warmObjVal);
    printf(" DF: %.10f\n", dualFuncObj);
    printf("RVF: %.10f\n", warmObjVal);
@@ -144,9 +145,11 @@ int main(int argc, char **argv)
    }
 
    sym_build_dual_func(env_warm);
-   print_dual_function(env_warm);
    sym_evaluate_dual_function(env_warm, rhs, 1, &dualFuncObj);
-
+   sym_get_obj_val(env_warm, &warmObjVal);
+   print_dual_function(env_warm);
+   printf(" DF: %.10f\n", dualFuncObj);
+   printf("RVF: %.10f\n", warmObjVal);
    
 
    // // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);

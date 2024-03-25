@@ -965,6 +965,7 @@ typedef struct DUAL_FUNC_DESC{
    int                *feas_stati;
    int                 num_terms; 
    OsiClpSolverInterface *si;
+   double              lp_cpu_time;
 }dual_func_desc;
 
 typedef struct WARM_START_DESC{
