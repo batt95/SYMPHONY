@@ -1645,7 +1645,13 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 		     
 		  } else {
 		     load_basis(lp_data, cstat, rstat);
-		     can->termcode[j] = initial_lp_solve(lp_data, can->iterd+j);
+			 // feb223: this is a problematic call, since CLP may
+			// do primal simplex and if iter limit is hit, then we 
+			// do not have a valid dual bound. This call has been set
+			// by Ted a while ago. In the meantime we 
+			// sort this out, let's switch to dual_simplex()
+		    //  can->termcode[j] = initial_lp_solve(lp_data, can->iterd+j);
+			 can->termcode[j] = dual_simplex(lp_data, can->iterd+j);
 		     total_iters+=*(can->iterd+j);
 		     
 		  }

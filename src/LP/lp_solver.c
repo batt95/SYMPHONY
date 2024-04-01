@@ -24,6 +24,8 @@
 #include "sym_macros.h"
 #include "sym_qsort.h"
 
+// #define CHECK_DUAL_SOLUTION
+
 #ifdef PRINT
 #undef PRINT
 #endif
@@ -2640,11 +2642,6 @@ void open_lp_solver(LPdata *lp_data)
    lp_data->si->messageHandler()->setLogLevel(0);
 #ifdef __OSI_CLP__
    lp_data->si->setupForRepeatedUse();
-   int options = lp_data->si->getModelPtr()->specialOptions();
-   // feb223
-   // For some reason OsiClp thinks its default is in branch and bound
-   // This option makes CLP creating ray while doing dual simplex
-   lp_data->si->getModelPtr()->setSpecialOptions((options|32));
    // lp_data->si->setupForRepeatedUse(3,0);
    // lp_data->si->getModelPtr()->setFactorizationFrequency(200);
    // lp_data->si->getModelPtr()->setSparseFactorization(true);
@@ -2685,6 +2682,10 @@ void load_lp_prob(LPdata *lp_data, int scaling, int fastmip)
    // As of now, dual rays may be incorrect when scaling is on
    // while we figure this out, turn off scaling
    lp_data->si->setHintParam(OsiDoScale,false,OsiHintDo);
+   // lp_data->si->setHintParam(OsiDoPresolveInInitial, false, OsiHintDo);
+   // lp_data->si->setHintParam(OsiDoPresolveInResolve, false, OsiHintDo);
+   // lp_data->si->setHintParam(OsiDoDualInInitial, true, OsiHintDo);
+   lp_data->si->setHintParam(OsiDoDualInResolve, true, OsiHintDo);
    MIPdesc *mip = lp_data->mip;
 
    lp_data->si->loadProblem(lp_data->n, lp_data->m,
@@ -2896,6 +2897,82 @@ void change_col(LPdata *lp_data, int col_ind,
 
 /*===========================================================================*/
 
+#ifdef CHECK_DUAL_SOLUTION
+int check_dual_solution(OsiXSolverInterface *si){
+  const double *c  = si->getObjCoefficients();
+  const double *pi = si->getRowPrice();
+  const double *dj = si->getReducedCost();
+  const CoinPackedMatrix *A = si->getMatrixByCol();
+  int n = si->getNumCols();
+  int m = si->getNumRows();
+  double *new_dj = new double[n];
+  double *piA = new double[n];
+  bool isDualFeas = TRUE;
+  A->transposeTimes(pi, piA);
+  int j;
+  for (j = 0; j < n; j++){
+    if (piA[j] + dj[j] - c[j] > 1e-5){
+      isDualFeas = FALSE;
+    }
+  }
+
+  if (isDualFeas){
+    printf("Dual feasible!\n");
+  } else {
+    printf("WARNING: Dual infeasible!\n");
+    printf("   Recomputing djs...\n");
+    isDualFeas = TRUE;
+    for (j = 0; j < n; j++){
+      if (si->getRowUpper()[j] == si->getRowLower()[j]){
+         new_dj[j] = c[j] - piA[j];
+      }
+      else{
+         new_dj[j] = dj[j];
+      }   
+      if (piA[j] + new_dj[j] - c[j] > 1e-5)
+         isDualFeas = FALSE;
+    }
+    if (isDualFeas)
+      printf("Now is feasible!\n");
+    else 
+      printf("Still infeas!\n");
+
+   double lb = 0;
+
+   for (int i = 0; i < m; i++)
+   {
+      if (si->getRowUpper()[i] < 1000000)
+      {
+         lb += si->getRowUpper()[i] * pi[i];
+      }
+      else
+      {
+         lb += si->getRowLower()[i] * pi[i];
+      }
+   }
+
+   for (int i = 0; i < n; i++){
+      if (new_dj[i] > 1e-5){
+         lb += si->getColLower()[i] * new_dj[i];
+      }   
+      else if (new_dj[i] < -1e-5){
+         lb += si->getColUpper()[i] * new_dj[i];
+      }
+   }
+   
+   // assert that recomputing djs does not change the 
+   // objValue
+   if (!si->isProvenPrimalInfeasible())
+      assert(fabs(lb - si->getObjValue()) < 0.00001);
+  }
+
+  delete[] new_dj;
+  delete[] piA;
+
+  return isDualFeas;
+}
+#endif
+
 /*===========================================================================*\
  * Solve the lp specified in lp_data->lp with dual simplex. The number of
  * iterations is returned in 'iterd'. The return value of the function is
@@ -2960,6 +3037,38 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
 
       lp_data->objval = si->getObjValue();
 
+#ifdef CHECK_DUAL_SOLUTION
+      check_dual_solution(lp_data->si);
+      switch (term)
+      {
+      case LP_OPTIMAL:
+         printf("            LP STATUS: LP_OPTIMAL\n");
+         break;
+
+      case LP_D_INFEASIBLE:
+         printf("            LP STATUS: LP_D_INFEASIBLE\n");
+         break;
+
+      case LP_D_UNBOUNDED:
+         printf("            LP STATUS: LP_D_UNBOUNDED\n");
+         break;
+      
+      case LP_D_ITLIM:
+         printf("            LP STATUS: LP_D_ITLIM\n");
+         break;
+
+      case LP_D_OBJLIM:
+         printf("            LP STATUS: LP_D_OBJLIM\n");
+         break;
+
+      case LP_ABANDONED:
+         printf("            LP STATUS: LP_ABANDONED\n");
+         break;
+      
+      default:
+         break;
+      }
+#endif
       /* Get relevant data */
       get_x(lp_data);
 
@@ -3012,8 +3121,6 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       if (term == LP_D_UNBOUNDED && lp_data->raysol)
       {
          get_dual_ray(lp_data); 
-         // lp_data->basis_idx = NULL; 
-         // lp_data->basis_len = 0;
       }
 
       if (term != LP_D_UNBOUNDED)
@@ -3025,8 +3132,6 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       int len = 0;
       int *cstat = (int *)malloc(ISIZE * lp_data->n);
       int *rstat = (int *)malloc(ISIZE * lp_data->m);
-      // int *basis_idx = (int *)malloc(ISIZE * lp_data->m);
-      // si->getBasics(basis_idx);
       get_basis(lp_data, cstat, rstat);
       for (int i = 0; i < lp_data->n; i++){
          if(cstat[i] == VAR_BASIC){
@@ -3044,26 +3149,6 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
 
       assert(len == lp_data->m);
 
-      // if (term == LP_OPTIMAL){
-      //    for (int i = 0; i < lp_data->basis_len; i++){
-      //    printf("%d ", lp_data->basis_idx[i]);
-      //    }
-      //    printf(" | ");
-      //    for (int i = 0; i < lp_data->maxm; i++){
-      //       printf("%.5f ", lp_data->dualsol[i]);
-      //    }
-      //    printf("\n");
-      //    printf("CSTAT: ");
-      //    for (int i = 0; i < lp_data->n; i++){
-      //       printf("%d ", cstat[i]);
-      //    }
-      //    printf("\n");
-      //    printf("RSTAT: ");
-      //    for (int i = 0; i < lp_data->m; i++){
-      //       printf("%d ", rstat[i]);
-      //    }
-      //    printf("\n------------\n");
-      // }
       FREE(cstat);
       FREE(rstat);
       
@@ -3158,6 +3243,41 @@ int dual_simplex(LPdata *lp_data, int *iterd)
 
       lp_data->objval = si->getObjValue();
 
+#ifdef CHECK_DUAL_SOLUTION
+      // if (fabs(lp_data->objval - (-1271.50000)) < 0.0001)
+      //    printf("here!\n");
+      check_dual_solution(lp_data->si);
+      switch (term)
+      {
+      case LP_OPTIMAL:
+         printf("            LP STATUS: LP_OPTIMAL\n");
+         break;
+
+      case LP_D_INFEASIBLE:
+         printf("            LP STATUS: LP_D_INFEASIBLE\n");
+         break;
+
+      case LP_D_UNBOUNDED:
+         printf("            LP STATUS: LP_D_UNBOUNDED\n");
+         break;
+      
+      case LP_D_ITLIM:
+         printf("            LP STATUS: LP_D_ITLIM\n");
+         break;
+
+      case LP_D_OBJLIM:
+         printf("            LP STATUS: LP_D_OBJLIM\n");
+         break;
+
+      case LP_ABANDONED:
+         printf("            LP STATUS: LP_ABANDONED\n");
+         break;
+      
+      default:
+         break;
+      }
+#endif
+
       /* Get relevant data */
       get_x(lp_data);
 
@@ -3165,10 +3285,10 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       {
          get_dj_pi(lp_data);
 
-         // Anahita
+          // Anahita
          double intercept = 0;
          for (int t = 0; t < lp_data->n; t++)
-         {
+         {  
             intercept += lp_data->x[t] * lp_data->dj[t];
          }
          lp_data->intcpt = intercept;
@@ -3203,15 +3323,12 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       if (lp_data->slacks && term == LP_OPTIMAL)
       {
          get_slacks(lp_data);
-
       }
 
       // Anahita
       if (term == LP_D_UNBOUNDED && lp_data->raysol)
       {
          get_dual_ray(lp_data); 
-         // lp_data->basis_idx = NULL; 
-         // lp_data->basis_len = 0;
       }
 
       if (term != LP_D_UNBOUNDED)
@@ -3223,8 +3340,6 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       int len = 0;
       int *cstat = (int *)malloc(ISIZE * lp_data->n);
       int *rstat = (int *)malloc(ISIZE * lp_data->m);
-      // int *basis_idx = (int *)malloc(ISIZE * lp_data->m);
-      // si->getBasics(basis_idx);
       get_basis(lp_data, cstat, rstat);
       for (int i = 0; i < lp_data->n; i++){
          if(cstat[i] == VAR_BASIC){
@@ -3239,32 +3354,6 @@ int dual_simplex(LPdata *lp_data, int *iterd)
          }
       }
       lp_data->basis_len = len;
-      // if (len != lp_data->m){
-      //    write_lp(lp_data, "wrong_basis_len");
-      //    assert(false);
-      // }
-
-      // if (term == LP_OPTIMAL){
-      //    for (int i = 0; i < lp_data->basis_len; i++){
-      //    printf("%d ", lp_data->basis_idx[i]);
-      //    }
-      //    printf(" | ");
-      //    for (int i = 0; i < lp_data->maxm; i++){
-      //       printf("%.5f ", lp_data->dualsol[i]);
-      //    }
-      //    printf("\n");
-      //    printf("CSTAT: ");
-      //    for (int i = 0; i < lp_data->n; i++){
-      //       printf("%d ", cstat[i]);
-      //    }
-      //    printf("\n");
-      //    printf("RSTAT: ");
-      //    for (int i = 0; i < lp_data->m; i++){
-      //       printf("%d ", rstat[i]);
-      //    }
-      //    printf("\n------------\n");
-      // }
-      
 
       FREE(cstat);
       FREE(rstat);
@@ -3671,8 +3760,6 @@ void get_dj_pi(LPdata *lp_data)
    double *dj = lp_data->dj;
    int numberColumns = lp_data->n;
    int t;
-   // feb223
-   // lp_data->si->getModelPtr()->computeDuals(NULL);
    memcpy(lp_data->dualsol, lp_data->si->getRowPrice(), lp_data->m * DSIZE);
    pi = lp_data->dualsol;
    memcpy(dj, lp_data->si->getReducedCost(), lp_data->n * DSIZE);
@@ -3692,24 +3779,6 @@ void get_dj_pi(LPdata *lp_data)
          dj[t] = value;
       }
    }
-   // double *my_djs = (double *)malloc(sizeof(double) * lp_data->n);
-   // for (t = 0; t < numberColumns; t++)
-   // {
-   //       int k;
-   //       double value = objective[t];
-   //       for (k = columnStart[t]; k < columnStart[t] + columnLength[t]; k++)
-   //       {
-   //          int iRow = row[k];
-   //          value -= elementByColumn[k] * pi[iRow];
-   //       }
-   //       dj[t] = value;
-   // }
-   // double *my_pi  = (double *)malloc(sizeof(double) * lp_data->m);
-   // 
-   // memcpy(my_pi, lp_data->si->getRowPrice(), lp_data->m * DSIZE);
-   // memcpy(my_djs, objective, lp_data->n * DSIZE);
-   // matrix->
-   // FREE(my_djs);
 }
 
 /*===========================================================================*/
@@ -3736,6 +3805,8 @@ void get_dual_ray(LPdata *lp_data)
       bool is_ray_empty = TRUE;
       // if (ray[1] < -1e-5){
       //    printf("here\n");
+      //    lp_data->si->getModelPtr()->writeLp("strange_ray_clp", "lp");
+      //    write_lp(lp_data, "strange_ray_symp");
       // }
       const double *inverseRowScale = lp_data->si->getModelPtr()->inverseRowScale();
       const double *rowScale = lp_data->si->getModelPtr()->rowScale();
@@ -3744,27 +3815,6 @@ void get_dual_ray(LPdata *lp_data)
       const CoinPackedMatrix *A = lp_data->si->getMatrixByCol();
       // A->dumpMatrix();
       double norm = 0;
-
-      // for (i = 0; i < lp_data->m; i++)
-      // {
-      //    if (fabs(ray[i]) > 1e-5){
-      //       is_ray_empty = FALSE;
-      //       break;
-      //    }
-      // } 
-
-      // if (is_ray_empty){
-      //    printf("RAY IS EMPTY!\n");
-      // }
-
-      // write_mps(lp_data, "strange_ray");
-
-      // if (inverseRowScale){
-      //    for (i = 0; i < lp_data->m; i++)
-      //    {
-      //       ray[i] /= inverseRowScale[i];
-      //    }
-      // }
 
       for (i = 0; i < lp_data->m; i++)
       {
@@ -3788,6 +3838,26 @@ void get_dual_ray(LPdata *lp_data)
 
       lp_data->has_ray = TRUE;
 
+      double farkasProof = 0;
+
+      for (int i = 0; i < lp_data->m; i++){
+         farkasProof -= lp_data->si->getRightHandSide()[i] * ray[i];
+      }
+
+      for (int j = 0; j < lp_data->n; j++){
+         if (rayA[j] > 1e-5){
+            farkasProof += lp_data->si->getColLower()[j] * rayA[j];
+         } else if (rayA[j] < -1e-5) {
+            farkasProof += lp_data->si->getColUpper()[j] * rayA[j];
+         }
+      }
+
+      if (farkasProof < -1e-5){
+         printf("Farkas Proof Failing!\n");
+      }
+      // assert(farkasProof > 1e-5);
+      
+
       // if (ray[1] == -1.00){
       //    printf("here\n");
       //    lp_data->si->writeLp("strange_ray", "lp");
@@ -3798,6 +3868,7 @@ void get_dual_ray(LPdata *lp_data)
    }
    else
    {
+      // write_lp(lp_data, "no_ray");
       double *ray = NULL;
       lp_data->has_ray = FALSE;
    }

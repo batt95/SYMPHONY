@@ -207,6 +207,8 @@ int main(int argc, char **argv)
       }
    }
 
+   printf("LP TIME from DUAL FUNC: %.5f\n", sym_get_lp_time_dual_func(env_warm));
+
    // Memory clean-ups
    sym_close_environment(env_warm);
    sym_close_environment(env_cold);

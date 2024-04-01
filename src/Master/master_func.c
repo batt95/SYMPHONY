@@ -3858,63 +3858,63 @@ void print_dual_function(warm_start_desc *ws)
 	// }
     
 	
-	// printf("==========================\n");
-	// printf("DISJUNCTION\n");
-	// printf("==========================\n");
-	// if (ws->dual_func->num_terms == 0){
-	// 	printf("Only root node in the B&B Tree!\n");
-	// 	printf("Feasibility Status: ");
-	// 		switch (ws->rootnode->feasibility_status)
-	// 		{
-	// 		case ROOT_NODE:
-	// 			printf("ROOT_NODE\n");
-	// 			break;
+	printf("==========================\n");
+	printf("DISJUNCTION\n");
+	printf("==========================\n");
+	if (ws->dual_func->num_terms == 0){
+		printf("Only root node in the B&B Tree!\n");
+		printf("Feasibility Status: ");
+			switch (ws->rootnode->feasibility_status)
+			{
+			case ROOT_NODE:
+				printf("ROOT_NODE\n");
+				break;
 			
-	// 		case INFEASIBLE_PRUNED:
-	// 			printf("INFEASIBLE_PRUNED\n");
-	// 			break;
+			case INFEASIBLE_PRUNED:
+				printf("INFEASIBLE_PRUNED\n");
+				break;
 			
-	// 		case FEASIBLE_PRUNED:
-	// 			printf("FEASIBLE_PRUNED\n");
-	// 			break;
+			case FEASIBLE_PRUNED:
+				printf("FEASIBLE_PRUNED\n");
+				break;
 
-	// 		case OVER_UB_PRUNED:
-	// 			printf("OVER_UB_PRUNED\n");
-	// 			break;
+			case OVER_UB_PRUNED:
+				printf("OVER_UB_PRUNED\n");
+				break;
 			
-	// 		default:
-	// 			printf("UNKNOWN\n");
-	// 			break;
-	// 		}
-	// } else {
-	// 	for (int i = 0; i < ws->dual_func->num_terms; i++)
-	// 	{
-	// 		printf("Feasibility Status: ");
-	// 		switch (ws->dual_func->feas_stati[i])
-	// 		{
-	// 		case ROOT_NODE:
-	// 			printf("ROOT_NODE\n");
-	// 			break;
+			default:
+				printf("UNKNOWN\n");
+				break;
+			}
+	} else {
+		for (int i = 0; i < ws->dual_func->num_terms; i++)
+		{
+			printf("Feasibility Status: ");
+			switch (ws->dual_func->feas_stati[i])
+			{
+			case ROOT_NODE:
+				printf("ROOT_NODE\n");
+				break;
 			
-	// 		case INFEASIBLE_PRUNED:
-	// 			printf("INFEASIBLE_PRUNED\n");
-	// 			break;
+			case INFEASIBLE_PRUNED:
+				printf("INFEASIBLE_PRUNED\n");
+				break;
 			
-	// 		case FEASIBLE_PRUNED:
-	// 			printf("FEASIBLE_PRUNED\n");
-	// 			break;
+			case FEASIBLE_PRUNED:
+				printf("FEASIBLE_PRUNED\n");
+				break;
 
-	// 		case OVER_UB_PRUNED:
-	// 			printf("OVER_UB_PRUNED\n");
-	// 			break;
+			case OVER_UB_PRUNED:
+				printf("OVER_UB_PRUNED\n");
+				break;
 			
-	// 		default:
-	// 			printf("UNKNOWN\n");
-	// 			break;
-	// 		}
-	// 		printDisjunction(ws->dual_func->disj[i]);
-	// 	}
-	// }
+			default:
+				printf("UNKNOWN\n");
+				break;
+			}
+			// printDisjunction(ws->dual_func->disj[i]);
+		}
+	}
 	
 
 	// printf("==========================\n");
@@ -3952,7 +3952,7 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
 	return is_added;
 }
 
-// int count_leaf = 0;
+int count_leaf = 0;
 
 void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				  branch_desc *bpath, int* curr_term, int* curr_piece, int* curr_ray, double** rays,
@@ -3973,7 +3973,8 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	int lbchange = 0, ubchange = 0; 
 	int level = node->bc_level, child_num = node->bobj.child_num;
 	double zerotol = 1e-9;
-	
+	int is_lower_bound_inherited = FALSE; 
+
 	branch_obj *bobj;
 	dual_hash *dual;
 	disjunction_desc disj;
@@ -3996,26 +3997,78 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			bpath[level - 1].rhs = bobj->rhs[j];
 			bpath[level - 1].range = bobj->range[j];
 			bpath[level - 1].branch = bobj->branch[j];
+		} else {
+			assert(false);
+		}
+		
+		if (!child_num)
+		{	
+			// Checks if the lower bound at this node is
+			// inherited from the parent. If yes, don't 
+			// consider this dual solution as it might 
+			// loose the dual function strength
+			double *lb = (double *)malloc(DSIZE * ws->n);
+			double *ub = (double *)malloc(DSIZE * ws->n);
+			memcpy(lb, mip->lb, DSIZE * ws->n);
+			memcpy(ub, mip->ub, DSIZE * ws->n);
+			for (int i = 0; i < level; i++){
+				varidx = bpath[i].name;
+				switch (bpath[i].sense)
+				{
+				case 'E':
+					lb[varidx] = bpath[i].rhs;
+					ub[varidx] = bpath[i].rhs;
+					break;
+				case 'L':
+					// if (bpath[i].rhs < mip->ub[varidx])
+						ub[varidx] = bpath[i].rhs;
+					break;
+				case 'G':
+					// if (bpath[i].rhs > mip->lb[varidx])
+						lb[varidx] = bpath[i].rhs;
+					break;
+				case 'R':
+					printf("Warning: Ranged constraints not handled!\n");
+					exit(1);
+					break;
+				}
+			}
+
+			double dualobj = 0;
+			for (int i = 0; i < ws->m; i++){
+				dualobj += mip->rhs[i] * node->duals[i];
+			}
+			for (int i = 0; i < ws->n; i++){
+				if (node->dj[i] > 1e-5)
+					dualobj += lb[i] * node->dj[i];
+				else if (node->dj[i] < -1e-5)
+					dualobj += ub[i] * node->dj[i];
+			}
+			// printf("   %d DualObjVal at this leaf: %.5f\n", count_leaf++, dualobj);
+			if ((fabs(dualobj - node->lower_bound) > 0.0001) && 
+			     fabs(node->lower_bound - node->parent->lower_bound) < 0.0001)
+				is_lower_bound_inherited = TRUE;
+				// printf("   WARNING: values mismatch!\n");
+
+			FREE(lb);
+			FREE(ub);
 		}
 	}
+	// TODO: deal with ITERATION_LIMIT and TIME_LIMIT
+	// TODO: if is_lower_bound_inherited == TRUE and 
+	//       policy is DUALS_LEAF_ONLY take the dual from the parent node
+
 	// check feasibility status of this node
-	if (node->feasibility_status == ROOT_NODE ||
+	if ((!is_lower_bound_inherited) && 
+	   (node->feasibility_status == ROOT_NODE ||
 		node->feasibility_status == FEASIBLE_PRUNED ||
 		node->feasibility_status == OVER_UB_PRUNED ||
-		node->feasibility_status == NODE_BRANCHED_ON 
+		node->feasibility_status == NODE_BRANCHED_ON )
 		){
 		if (node->duals && node->dj && (!node->rays) &&
 		((ws->dual_func->policy == DUALS_SAVE_ALL) ||
 		 (ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
 		{
-			// for (int i = 0; i < node->basis_len; i++){
-			// printf("%d ", node->basis_idx[i]);
-			// }
-			// printf(" | ");
-			// for (int i = 0; i < ws->m; i++){
-			// 	printf("%.5f ", node->duals[i]);
-			// }
-			// printf("\n------------\n");
 			dual = NULL;
 			if (node->basis_idx && (node->basis_len > 0)){
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
@@ -4069,7 +4122,8 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	if (!child_num)
 	{
 		ws->dual_func->feas_stati[(*curr_leaf)++] = node->feasibility_status; 
-		// printf(" - %d Fesibility status of this leaf: %d\n", count_leaf++, node->feasibility_status);
+		printf(" - %d Fesibility status of this leaf: %d\n", count_leaf, node->feasibility_status);
+		printf("   %d Lower bound at this leaf: %.5f\n", count_leaf, node->lower_bound);
 		if (level > 0)
 		{
 			disj.lb, disj.lbvaridx, disj.ub, disj.ubvaridx = NULL, NULL, NULL, NULL;
@@ -4087,11 +4141,11 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 					ub[varidx] = bpath[i].rhs;
 					break;
 				case 'L':
-					if (bpath[i].rhs < mip->ub[varidx])
+					// if (bpath[i].rhs < mip->ub[varidx])
 						ub[varidx] = bpath[i].rhs;
 					break;
 				case 'G':
-					if (bpath[i].rhs > mip->lb[varidx])
+					// if (bpath[i].rhs > mip->lb[varidx])
 						lb[varidx] = bpath[i].rhs;
 					break;
 				case 'R':
@@ -4147,13 +4201,28 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			ws->dual_func->disj[*curr_term] = disj;
 			(*curr_term)++;
 
+			double dualobj = 0;
+			for (int i = 0; i < ws->m; i++){
+				dualobj += mip->rhs[i] * node->duals[i];
+			}
+			for (int i = 0; i < ws->n; i++){
+				if (node->dj[i] > 1e-5)
+					dualobj += lb[i] * node->dj[i];
+				else if (node->dj[i] < -1e-5)
+					dualobj += ub[i] * node->dj[i];
+			}
+			printf("   %d DualObjVal at this leaf: %.5f\n", count_leaf++, dualobj);
+			if (fabs(dualobj - node->lower_bound) > 0.0001)
+				printf("   WARNING: values mismatch!\n");
+			 
+
 			// Must collect the ray
 			if ((node->feasibility_status == INFEASIBLE_PRUNED)){
 				if (!node->rays){
 					// This should never happen now, but if it does, resolve the LP
 					// and get the ray
-					// printf(" WARNING in collect_duals():\n");
-					// printf(" Infeasible node without rays!\n");
+					printf(" WARNING in collect_duals():\n");
+					printf(" Infeasible node without rays!\n");
 					clock_t start, end;
 					double cpu_time_used;
 					start = clock();
@@ -4242,6 +4311,21 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				if (node->rays){
 					bool is_duplicate = false;
 					bool is_all_zero = true;
+					double ray_times_b = 0;
+					for (int i = 0; i < ws->m; i++){
+						ray_times_b -= node->rays[i] * mip->rhs[i];
+					}
+
+					for (int i = ws->m; i < ws->m + ws->n; i++){
+						if (node->rays[i] > zerotol){
+							ray_times_b += node->rays[i] * lb[i - ws->m];
+						} 
+						else if (node->rays[i] < -zerotol){
+							ray_times_b += node->rays[i] * ub[i - ws->m];
+						}
+					}
+
+					assert(ray_times_b > 1e-5);
 					// Check that the ray is not all zeros
 					for (i = 0; i < ws->m + ws->n; i++)
 					{
@@ -4304,7 +4388,7 @@ int build_dual_func(sym_environment *env)
 {
 
 #ifdef SENSITIVITY_ANALYSIS
-
+	count_leaf = 0;
 	warm_start_desc *ws = env->warm_start;
 	MIPdesc *mip = env->mip;
 	ws->m = mip->m;
@@ -4510,7 +4594,8 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 
 	// Build the new rhs to be of the correct size, ws->m
 	double *rhs = (double *)malloc(ws->m * sizeof(double));
-	memcpy(rhs, new_rhs, size_new_rhs * sizeof(double));
+
+	memcpy(rhs, new_rhs, CoinMin(size_new_rhs, ws->m) * sizeof(double));
 	if (size_new_rhs < ws->m){
 		for (int i = size_new_rhs; i < ws->m; i++){
 			rhs[i] = mip->rhs[i];
@@ -4654,7 +4739,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 					}
 				}
 
-				if (ray_times_b > zerotol){
+				if (ray_times_b > 1e-5){
 					// This term of the disjunction is infeasible for this rhs
 					// and should not be considered
 					is_term_feas[t] = false;
@@ -4695,19 +4780,23 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			si->initialSolve();
 
 			if (si->isProvenPrimalInfeasible()){
-				is_term_feas[t] = FALSE;
-				// if (is_term_feas[t])
-				// 	si->writeLp("proof_not_working", "lp");
-				// assert(!is_term_feas[t]);
+				if (is_term_feas[t]){
+					printf("Warning: FarkasProof not working!\n");
+					is_term_feas[t] = FALSE;
+					// si->writeLp("proof_not_working", "lp");
+					// si->writeMps("proof_not_working");
+					// print_dual_function(ws);
+					// assert(!is_term_feas[t]);
+				}
 			} else if (si->isProvenOptimal()){
-				is_term_feas[t] = TRUE;
-				// sanity_objVal = si->getObjValue();
-				// if (sanity_objVal == -2663.00){
-				// 	printf("HERE\n");
-				// if (!is_term_feas[t]){
-				// 	si->writeLp("proof_not_working", "lp");
-				// 	assert(is_term_feas[t]);
-				// }
+				if (!is_term_feas[t]){
+					printf("Warning: FarkasProof not working!\n");
+					is_term_feas[t] = TRUE;
+					// si->writeLp("proof_not_working", "lp");
+					// si->writeMps("proof_not_working");
+					// print_dual_function(ws);
+					// assert(is_term_feas[t]);
+				}
 				
 			}
 		}
@@ -4742,20 +4831,20 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			ub[idx] = disj->ub[i];
 		}
 #ifdef DEBUG_DUAL_FUNC
-		// si->loadProblem(ws->n, ws->m,
-		// 					mip->matbeg, mip->matind,
-		// 					mip->matval, lb,
-		// 					ub, mip->obj,
-		// 					mip->sense, rhs,
-		// 					mip->rngval);
+		si->loadProblem(ws->n, ws->m,
+							mip->matbeg, mip->matind,
+							mip->matval, lb,
+							ub, mip->obj,
+							mip->sense, rhs,
+							mip->rngval);
 		
-		// si->initialSolve();
-		// if (si->isProvenOptimal()){
-		// 	sanity_objVal = si->getObjValue();
-		// } else {
-		// 	// Should never happen!
-		// 	assert(false);
-		// }
+		si->initialSolve();
+		if (si->isProvenOptimal()){
+			sanity_objVal = si->getObjValue();
+		} else {
+			// Should never happen!
+			assert(false);
+		}
 #endif
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
 			curr_piece_bound = rhs_times_pi[i];
@@ -4815,7 +4904,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		// This assertion may fail since CLP might have stopped
 		// the solution of LPs prematurely due to the curr UB in the Tree
 		// but this is not a problem
-		// assert(fabs(local_best_bound - sanity_objVal) <= 0.1);
+		assert((local_best_bound - sanity_objVal) < 0.001);
 #endif	
 		if (local_best_bound < global_best_bound - granularity){
 			global_best_bound = local_best_bound;
