@@ -80,7 +80,7 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "keep_warm_start", TRUE);
    sym_set_int_param(env_warm, "keep_dual_function_description", TRUE);
    sym_set_int_param(env_warm, "should_use_rel_br", FALSE);
-   sym_set_int_param(env_warm, "use_hot_starts", FALSE);
+   sym_set_int_param(env_warm, "use_hot_starts", TRUE);
    sym_set_int_param(env_warm, "should_warmstart_node", TRUE);
    sym_set_int_param(env_warm, "sensitivity_analysis", TRUE);
    sym_set_int_param(env_warm, "sensitivity_rhs", true);
@@ -129,9 +129,9 @@ int main(int argc, char **argv)
    printf(" DF: %.10f\n", dualFuncObj);
    printf("RVF: %.10f\n", warmObjVal);
 
-   double zeta[9] = {-1285.000, -963.750, -803.125, -642.500, -481.875, -321.250, -160.625, 0.000};
+   double zeta[3] = {-1285.000, -963.750, -803.125}; // -642.500, -481.875, -321.250, -160.625, 0.000};
 
-   for (int i = 0; i < 9; i++){
+   for (int i = 0; i < 3; i++){
       printf("======================================\n");
       rhs[0] = zeta[i];
 
@@ -300,6 +300,8 @@ int main(int argc, char **argv)
    // Memory clean-ups
    sym_close_environment(env_warm);
    sym_close_environment(env_cold);
+
+   free(rhs);
 
    // free(zeta_lst);
    // free(rvf_lst);

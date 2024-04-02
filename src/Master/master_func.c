@@ -4002,9 +4002,6 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 	memcpy(ub, mip->ub, DSIZE * ws->n);
 	for (int i = 0; i < level; i++){
 		varidx = bpath[i].name;
-		if (node->bc_index == 45){
-			printf("here!");
-		}
 		switch (bpath[i].sense)
 		{
 		case 'E':
@@ -4066,9 +4063,10 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 			// assert(dualobj_parent - node->lower_bound > 0.0001);
 		}
 		
-		FREE(lb);
-		FREE(ub);
 	}
+
+	FREE(lb);
+	FREE(ub);
 // #endif
 	// TODO: deal with ITERATION_LIMIT and TIME_LIMIT
 	// TODO: if is_lower_bound_inherited == TRUE and 
@@ -4091,6 +4089,10 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
 				dual->len = node->basis_len;
+				if (dual){
+					FREE(dual->basis_idx);
+					FREE(dual);
+				}
 			} 
 			// try to add this dual into the hashtable
 			if (TRUE || (dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)))){

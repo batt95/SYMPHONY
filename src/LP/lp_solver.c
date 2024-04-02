@@ -2638,7 +2638,7 @@ void open_lp_solver(LPdata *lp_data)
    lp_data->si = new OsiXSolverInterface();
 
    /* Turn off the OSL messages (There are LOTS of them) */
-   // lp_data->si->setHintParam(OsiDoReducePrint);
+   lp_data->si->setHintParam(OsiDoReducePrint);
    lp_data->si->messageHandler()->setLogLevel(0);
 #ifdef __OSI_CLP__
    lp_data->si->setupForRepeatedUse();
@@ -2934,7 +2934,7 @@ int check_dual_solution(OsiXSolverInterface *si){
     printf("   Recomputing djs...\n");
     isDualFeas = TRUE;
     for (j = 0; j < n; j++){
-      if (si->getRowUpper()[j] == si->getRowLower()[j]){
+      if (si->getColUpper()[j] == si->getColLower()[j]){
          new_dj[j] = c[j] - piA[j];
       }
       else{
