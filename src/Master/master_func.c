@@ -3764,20 +3764,6 @@ int get_num_leaf_nodes(bc_node *node, int *num_rays)
 
 /*===========================================================================*/
 
-void printDualSolution(dual_solution sol){
-    printf("--------------------\n");
-	printf("dual: ");
-    for(int i = 0; i < sol.nnz; i++){
-        printf("%d : %.5f, ", sol.idx[i], sol.val[i]);
-    }
-
-	printf("\ndjs: ");
-	for(int i = 0; i < sol.djs->nnz; i++){
-        printf("%d : %.3f, ", sol.djs->idx[i], sol.djs->val[i]);
-    }
-    printf("\n");
-}
-
 void printDisjunction(disjunction_desc disj){
 	printf("LBs: ");
     for(int i = 0; i < disj.lblen; i++){
@@ -3953,8 +3939,9 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
 }
 
 int count_leaf = 0;
+int optimal_leaf_found = 0;
 
-void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
+void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 				  branch_desc *bpath, int* curr_term, int* curr_piece, int* curr_ray, double** rays,
 				  int *duals_index_row, int *duals_index_col, double *duals_val,
 				  int *nnz_duals, int *max_poss_nnz, int *curr_leaf){
@@ -3967,6 +3954,8 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	const CoinPackedMatrix *A;
 	// if (!node->parent) count_leaf = 0;
 
+	warm_start_desc *ws = env->warm_start;
+
 	int i, j, k, l;
 	int is_added = 0;
 	int varidx, nnz = 0;
@@ -3974,6 +3963,8 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	int level = node->bc_level, child_num = node->bobj.child_num;
 	double zerotol = 1e-9;
 	int is_lower_bound_inherited = FALSE; 
+
+	double dualobj = 0, dualobj_parent = 0;
 
 	branch_obj *bobj;
 	dual_hash *dual;
@@ -3998,62 +3989,87 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			bpath[level - 1].range = bobj->range[j];
 			bpath[level - 1].branch = bobj->branch[j];
 		} else {
-			assert(false);
-		}
-		
-		if (!child_num)
-		{	
-			// Checks if the lower bound at this node is
-			// inherited from the parent. If yes, don't 
-			// consider this dual solution as it might 
-			// loose the dual function strength
-			double *lb = (double *)malloc(DSIZE * ws->n);
-			double *ub = (double *)malloc(DSIZE * ws->n);
-			memcpy(lb, mip->lb, DSIZE * ws->n);
-			memcpy(ub, mip->ub, DSIZE * ws->n);
-			for (int i = 0; i < level; i++){
-				varidx = bpath[i].name;
-				switch (bpath[i].sense)
-				{
-				case 'E':
-					lb[varidx] = bpath[i].rhs;
-					ub[varidx] = bpath[i].rhs;
-					break;
-				case 'L':
-					// if (bpath[i].rhs < mip->ub[varidx])
-						ub[varidx] = bpath[i].rhs;
-					break;
-				case 'G':
-					// if (bpath[i].rhs > mip->lb[varidx])
-						lb[varidx] = bpath[i].rhs;
-					break;
-				case 'R':
-					printf("Warning: Ranged constraints not handled!\n");
-					exit(1);
-					break;
-				}
-			}
-
-			double dualobj = 0;
-			for (int i = 0; i < ws->m; i++){
-				dualobj += mip->rhs[i] * node->duals[i];
-			}
-			for (int i = 0; i < ws->n; i++){
-				if (node->dj[i] > 1e-5)
-					dualobj += lb[i] * node->dj[i];
-				else if (node->dj[i] < -1e-5)
-					dualobj += ub[i] * node->dj[i];
-			}
-			// printf("   %d DualObjVal at this leaf: %.5f\n", count_leaf++, dualobj);
-			if ((fabs(dualobj - node->lower_bound) > 0.0001) && 
-			     fabs(node->lower_bound - node->parent->lower_bound) < 0.0001)
-				is_lower_bound_inherited = TRUE;
-				// printf("   WARNING: values mismatch!\n");
-
-			FREE(lb);
-			FREE(ub);
+			// BRANCHING_CUT
+			printf("Branching type not handled!\n");
+			exit(1);
 		}
 	}
+// #ifdef CHECK_DUALS
+	// Check the dual obj val and lower_bound matches
+	double *lb = (double *)malloc(DSIZE * ws->n);
+	double *ub = (double *)malloc(DSIZE * ws->n);
+	memcpy(lb, mip->lb, DSIZE * ws->n);
+	memcpy(ub, mip->ub, DSIZE * ws->n);
+	for (int i = 0; i < level; i++){
+		varidx = bpath[i].name;
+		if (node->bc_index == 45){
+			printf("here!");
+		}
+		switch (bpath[i].sense)
+		{
+		case 'E':
+			lb[varidx] = bpath[i].rhs;
+			ub[varidx] = bpath[i].rhs;
+			break;
+		case 'L':
+			// if (bpath[i].rhs < mip->ub[varidx])
+				ub[varidx] = bpath[i].rhs;
+			break;
+		case 'G':
+			// if (bpath[i].rhs > mip->lb[varidx])
+				lb[varidx] = bpath[i].rhs;
+			break;
+		case 'R':
+			printf("Warning: Ranged constraints not handled!\n");
+			exit(1);
+			break;
+		}
+	}
+
+	// Dual Obj Value of this node 
+	dualobj = 0;
+	for (int i = 0; i < ws->m; i++){
+		dualobj += mip->rhs[i] * node->duals[i];
+	}
+	for (int i = 0; i < ws->n; i++){
+		if (node->dj[i] > 1e-5)
+			dualobj += lb[i] * node->dj[i];
+		else if (node->dj[i] < -1e-5)
+			dualobj += ub[i] * node->dj[i];
+	}
+
+	if (!child_num)
+	{	
+		// Checks if the lower bound at this node is
+		// inherited from the parent. If yes, don't 
+		// consider this dual solution as it might 
+		// loose the dual function strength
+
+		// Dual Obj Value of this node using node->parent->duals
+		for (int i = 0; i < ws->m; i++){
+			dualobj_parent += mip->rhs[i] * node->parent->duals[i];
+		}
+		for (int i = 0; i < ws->n; i++){
+			if (node->dj[i] > 1e-5)
+				dualobj_parent += lb[i] * node->parent->dj[i];
+			else if (node->dj[i] < -1e-5)
+				dualobj_parent += ub[i] * node->parent->dj[i];
+		}
+
+		// printf("   %d DualObjVal at this leaf: %.5f\n", count_leaf++, dualobj);
+		if ((fabs(dualobj - node->lower_bound) > 0.0001) && 
+				fabs(node->lower_bound - node->parent->lower_bound) < 0.0001)
+		{
+			is_lower_bound_inherited = TRUE;
+			// Check that the dual solution of the parent 
+			// let us achieve node->lower_bound
+			// assert(dualobj_parent - node->lower_bound > 0.0001);
+		}
+		
+		FREE(lb);
+		FREE(ub);
+	}
+// #endif
 	// TODO: deal with ITERATION_LIMIT and TIME_LIMIT
 	// TODO: if is_lower_bound_inherited == TRUE and 
 	//       policy is DUALS_LEAF_ONLY take the dual from the parent node
@@ -4077,9 +4093,8 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 				dual->len = node->basis_len;
 			} 
 			// try to add this dual into the hashtable
-			if ((dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)))){
+			if (TRUE || (dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)))){
 				// successfully added, collect reduced costs
-				int *num_piece = &(ws->dual_func->num_pieces);
 				// find nnzs and fill reduced costs related structures
 				for (i = 0; i < ws->m; i++)
 				{
@@ -4105,7 +4120,6 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 					}
 				}
 				(*curr_piece)++;
-				// (ws->dual_func->num_pieces)++;
 
 			} else {
 				// This dual is a duplicate, we can FREE it
@@ -4199,22 +4213,49 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 			}
 
 			ws->dual_func->disj[*curr_term] = disj;
+
+			// Check the new_lb/new_ub are correct
+			double *new_lb = (double *)malloc(DSIZE * ws->n);
+			double *new_ub = (double *)malloc(DSIZE * ws->n);
+			memcpy(new_lb, mip->lb, DSIZE * ws->n);
+			memcpy(new_ub, mip->ub, DSIZE * ws->n);
+
+			for (int i = 0; i < disj.ublen; i++){
+				new_ub[disj.ubvaridx[i]] = disj.ub[i];
+			}
+
+			for (int i = 0; i < disj.lblen; i++){
+				new_lb[disj.lbvaridx[i]] = disj.lb[i];
+			}
+
+			for (int i = 0; i < ws->n; i++){
+				assert(fabs(new_lb[i] - lb[i]) < 0.0001);
+				assert(fabs(new_ub[i] - ub[i]) < 0.0001);
+			}
+
+			FREE(new_lb);
+			FREE(new_ub);
+
 			(*curr_term)++;
 
-			double dualobj = 0;
-			for (int i = 0; i < ws->m; i++){
-				dualobj += mip->rhs[i] * node->duals[i];
-			}
-			for (int i = 0; i < ws->n; i++){
-				if (node->dj[i] > 1e-5)
-					dualobj += lb[i] * node->dj[i];
-				else if (node->dj[i] < -1e-5)
-					dualobj += ub[i] * node->dj[i];
-			}
-			printf("   %d DualObjVal at this leaf: %.5f\n", count_leaf++, dualobj);
-			if (fabs(dualobj - node->lower_bound) > 0.0001)
+			if (is_lower_bound_inherited)
+				printf("   %d DualObjVal at this leaf inherited from parent: %.5f\n", count_leaf++, dualobj_parent);
+			else
+				printf("   %d DualObjVal at this leaf: %.5f\n", count_leaf++, dualobj);
+			
+			if ((node->feasibility_status != INFEASIBLE_PRUNED) && 
+			   (!is_lower_bound_inherited) && 
+			   (fabs(dualobj - node->lower_bound) > 0.0001))
 				printf("   WARNING: values mismatch!\n");
-			 
+
+			assert((node->feasibility_status != INFEASIBLE_PRUNED) || !is_lower_bound_inherited);
+			if (fabs(ws->lb - dualobj) < 0.0001){
+				printf("OPTIMAL LEAF HERE!\n");
+			} else {
+				assert((node->feasibility_status == INFEASIBLE_PRUNED) ||
+					   (is_lower_bound_inherited && dualobj_parent >= ws->lb) ||
+					    (dualobj + ws->dual_func->granularity >= ws->lb));
+			}
 
 			// Must collect the ray
 			if ((node->feasibility_status == INFEASIBLE_PRUNED)){
@@ -4378,7 +4419,7 @@ void collect_duals(warm_start_desc *ws, bc_node *node, MIPdesc *mip,
 	} else {
 		// if child_num > 0, then do recursion on child nodes
 		for (j = 0; j < child_num; j++)
-			collect_duals(ws, node->children[j], mip, bpath, curr_term, curr_piece, curr_ray, rays,
+			collect_duals(env, node->children[j], mip, bpath, curr_term, curr_piece, curr_ray, rays,
 						duals_index_row, duals_index_col, duals_val, nnz_duals, max_poss_nnz, curr_leaf);
 
 	}
@@ -4467,12 +4508,13 @@ int build_dual_func(sym_environment *env)
 
 	int curr_leaf = 0; // Debug: check the stati of leaves
 
-	collect_duals(ws, ws->rootnode, mip, bpath, &curr_term, &curr_piece, &curr_ray, rays,
+	collect_duals(env, ws->rootnode, mip, bpath, &curr_term, &curr_piece, &curr_ray, rays,
 				 duals_index_row, duals_index_col, duals_val, &nnz_duals, &tot_piece, &curr_leaf);
 
 	// Update the actual number of disjunction terms
 	// Infeasible leaf lead to infeasible disjunction term
 	ws->dual_func->num_terms = curr_term;
+	assert(num_leaf == curr_term);
 
 	// if (nnz_duals)
 	// 	printf("DEBUG: matrix sparsity %.3f\n", ((double)(nnz_duals)/(double)(tot_piece)));
@@ -4502,7 +4544,15 @@ int build_dual_func(sym_environment *env)
 		}
 
 		// There should be a limit on the number of dual solutions we can collect
-		ws->dual_func->num_pieces = ws->dual_func->duals->getMajorDim();
+		// ws->dual_func->num_pieces = ws->dual_func->duals->getMajorDim();
+		ws->dual_func->num_pieces += curr_piece;
+		assert(ws->dual_func->num_pieces ==  ws->dual_func->duals->getMajorDim());
+		int len_ht = 0;
+		dual_hash *s;
+		for (s = ws->dual_func->hashtb; s != NULL; s = (dual_hash*)s->hh.next){
+			len_ht++;
+		}
+		// assert(len_ht == ws->dual_func->num_pieces);
 	}
 
 	if (curr_ray > 0){
@@ -4906,14 +4956,14 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		// but this is not a problem
 		assert((local_best_bound - sanity_objVal) < 0.001);
 #endif	
-		if (local_best_bound < global_best_bound - granularity){
+		if (local_best_bound - global_best_bound < -1e-7){ //  - granularity
 			global_best_bound = local_best_bound;
 		}
 	}
 	
 TERM_EVAL_DUAL_FUNC:
 
-	*dual_bound = global_best_bound;
+	*dual_bound = floor(global_best_bound + granularity);
 
 	FREE(rhs_times_pi);
 	FREE(is_infty);

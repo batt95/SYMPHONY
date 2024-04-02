@@ -94,6 +94,7 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "generate_cgl_cuts", FALSE);
    sym_set_int_param(env_warm, "max_active_nodes", 1);
    sym_set_int_param(env_warm, "max_presolve_iter", 0);
+   sym_set_int_param(env_warm, "limit_strong_branching_time", 0);
 
    sym_set_int_param(env_cold, "keep_warm_start", TRUE);
    sym_set_int_param(env_cold, "keep_dual_function_description", TRUE);

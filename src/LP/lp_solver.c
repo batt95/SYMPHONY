@@ -24,7 +24,7 @@
 #include "sym_macros.h"
 #include "sym_qsort.h"
 
-// #define CHECK_DUAL_SOLUTION
+#define CHECK_DUAL_SOLUTION
 
 #ifdef PRINT
 #undef PRINT
@@ -2638,7 +2638,7 @@ void open_lp_solver(LPdata *lp_data)
    lp_data->si = new OsiXSolverInterface();
 
    /* Turn off the OSL messages (There are LOTS of them) */
-   lp_data->si->setHintParam(OsiDoReducePrint);
+   // lp_data->si->setHintParam(OsiDoReducePrint);
    lp_data->si->messageHandler()->setLogLevel(0);
 #ifdef __OSI_CLP__
    lp_data->si->setupForRepeatedUse();
@@ -2647,7 +2647,7 @@ void open_lp_solver(LPdata *lp_data)
    int moreOptions = lp_data->si->getModelPtr()->moreSpecialOptions();
    
    options |= 32           // CLP creates ray while doing dual simplex
-            // + 2048         // CLP does not cruch the problem
+            + 2048         // CLP does not cruch the problem
                               // maybe not needed if we recompute dj's on fixed vars ???
             + 0x08000000;  // CLP computes accurate duals on LP_D_ITLIM
    moreOptions |= 8192;    // CLP uses dual simplex if it has suggested to do so
@@ -3428,6 +3428,41 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
 
       lp_data->objval = si->getObjValue();
 
+#ifdef CHECK_DUAL_SOLUTION
+      // if (fabs(lp_data->objval - (-1271.50000)) < 0.0001)
+      //    printf("here!\n");
+      check_dual_solution(lp_data->si);
+      switch (term)
+      {
+      case LP_OPTIMAL:
+         printf("            LP STATUS: LP_OPTIMAL\n");
+         break;
+
+      case LP_D_INFEASIBLE:
+         printf("            LP STATUS: LP_D_INFEASIBLE\n");
+         break;
+
+      case LP_D_UNBOUNDED:
+         printf("            LP STATUS: LP_D_UNBOUNDED\n");
+         break;
+      
+      case LP_D_ITLIM:
+         printf("            LP STATUS: LP_D_ITLIM\n");
+         break;
+
+      case LP_D_OBJLIM:
+         printf("            LP STATUS: LP_D_OBJLIM\n");
+         break;
+
+      case LP_ABANDONED:
+         printf("            LP STATUS: LP_ABANDONED\n");
+         break;
+      
+      default:
+         break;
+      }
+#endif
+
       /* Get relevant data */
       get_x(lp_data);
 
@@ -3473,36 +3508,12 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
       if (lp_data->slacks && term == LP_OPTIMAL)
       {
          get_slacks(lp_data);
-
-         // feb223
-         int len = 0;
-         int *cstat = (int *)malloc(ISIZE * lp_data->n);
-         int *rstat = (int *)malloc(ISIZE * lp_data->m);
-         get_basis(lp_data, cstat, rstat);
-         for (int i = 0; i < lp_data->n; i++){
-            if(cstat[i] == VAR_BASIC){
-               lp_data->basis_idx[len] = i;
-               len++;
-            }
-         }
-         for (int i = 0; i < lp_data->m; i++){
-            if(rstat[i] == VAR_BASIC){
-               lp_data->basis_idx[len] = lp_data->n + i;
-               len++;
-            }
-         }
-         lp_data->basis_len = len;
-
-         FREE(cstat);
-         FREE(rstat);
       }
 
       // Anahita
       if (term == LP_D_UNBOUNDED && lp_data->raysol)
       {
          get_dual_ray(lp_data); 
-         // lp_data->basis_idx = NULL; 
-         // lp_data->basis_len = 0;
       }
 
       if (term != LP_D_UNBOUNDED)
@@ -3510,14 +3521,27 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
          lp_data->has_ray = FALSE;
       }
 
-      // for (int i = 0; i < lp_data->basis_len; i++){
-      //    printf("%d ", lp_data->basis_idx[i]);
-      // }
-      // printf(" | ");
-      // for (int i = 0; i < lp_data->maxm; i++){
-      //    printf("%.5f ", lp_data->dualsol[i]);
-      // }
-      // printf("\n");
+      // feb223
+      int len = 0;
+      int *cstat = (int *)malloc(ISIZE * lp_data->n);
+      int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      get_basis(lp_data, cstat, rstat);
+      for (int i = 0; i < lp_data->n; i++){
+         if(cstat[i] == VAR_BASIC){
+            lp_data->basis_idx[len] = i;
+            len++;
+         }
+      }
+      for (int i = 0; i < lp_data->m; i++){
+         if(rstat[i] == VAR_BASIC){
+            lp_data->basis_idx[len] = lp_data->n + i;
+            len++;
+         }
+      }
+      lp_data->basis_len = len;
+
+      FREE(cstat);
+      FREE(rstat);
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }

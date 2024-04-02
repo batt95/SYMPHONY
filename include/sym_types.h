@@ -916,21 +916,6 @@ typedef struct MIPDESC{
  * the algorithm.
 \*===========================================================================*/
 // feb223
-typedef struct DJS_DESC {
-    int         *idx;       // nnz idx djs
-    double      *val;       // nnz val djs
-    int         nnz;        // length of idx and val pointers
-} djs_desc;
-
-// uthash.h hashtable is used to keep unique dual solutions
-typedef struct DUAL_SOLUTION {
-    int         hash;       // field to make this struct hashable
-    int         *idx;       // nnz idx dual multipliers
-    double      *val;       // nnz val dual multipliers
-    int         nnz;        // length of idx and val pointers
-    djs_desc   *djs;        // reduced costs
-    UT_hash_handle hh;      // hashmap handler
-} dual_solution;
 
 // uthash.h hashtable is used to keep unique dual solutions
 typedef struct DUAL_HASH {
