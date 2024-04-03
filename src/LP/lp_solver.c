@@ -24,7 +24,7 @@
 #include "sym_macros.h"
 #include "sym_qsort.h"
 
-#define CHECK_DUAL_SOLUTION
+// #define CHECK_DUAL_SOLUTION
 
 #ifdef PRINT
 #undef PRINT

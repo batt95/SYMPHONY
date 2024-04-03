@@ -80,7 +80,7 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "keep_warm_start", TRUE);
    sym_set_int_param(env_warm, "keep_dual_function_description", TRUE);
    sym_set_int_param(env_warm, "should_use_rel_br", FALSE);
-   sym_set_int_param(env_warm, "use_hot_starts", FALSE);
+   sym_set_int_param(env_warm, "use_hot_starts", TRUE);
    sym_set_int_param(env_warm, "should_warmstart_node", TRUE);
    sym_set_int_param(env_warm, "sensitivity_analysis", TRUE);
    sym_set_int_param(env_warm, "sensitivity_rhs", true);
@@ -93,8 +93,8 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "do_reduced_cost_fixing", FALSE);
    sym_set_int_param(env_warm, "generate_cgl_cuts", FALSE);
    sym_set_int_param(env_warm, "max_active_nodes", 1);
-   sym_set_int_param(env_warm, "max_presolve_iter", 0);
-   sym_set_int_param(env_warm, "limit_strong_branching_time", 0);
+   // sym_set_int_param(env_warm, "max_presolve_iter", 0);
+   // sym_set_int_param(env_warm, "limit_strong_branching_time", 0);
 
    sym_set_int_param(env_cold, "keep_warm_start", TRUE);
    sym_set_int_param(env_cold, "keep_dual_function_description", TRUE);

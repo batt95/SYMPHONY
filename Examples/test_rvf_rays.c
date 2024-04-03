@@ -80,7 +80,7 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "keep_warm_start", TRUE);
    sym_set_int_param(env_warm, "keep_dual_function_description", TRUE);
    sym_set_int_param(env_warm, "should_use_rel_br", FALSE);
-   sym_set_int_param(env_warm, "use_hot_starts", TRUE);
+   sym_set_int_param(env_warm, "use_hot_starts", FALSE);
    sym_set_int_param(env_warm, "should_warmstart_node", TRUE);
    sym_set_int_param(env_warm, "sensitivity_analysis", TRUE);
    sym_set_int_param(env_warm, "sensitivity_rhs", true);
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "do_reduced_cost_fixing", FALSE);
    sym_set_int_param(env_warm, "generate_cgl_cuts", FALSE);
    sym_set_int_param(env_warm, "max_active_nodes", 1);
-   sym_set_int_param(env_warm, "max_presolve_iter", 100);
+   // sym_set_int_param(env_warm, "max_presolve_iter", 100);
    // sym_set_int_param(env_warm, "limit_strong_branching_time", 0);
 
    sym_set_int_param(env_cold, "keep_warm_start", TRUE);
@@ -123,15 +123,15 @@ int main(int argc, char **argv)
    }
    
    sym_build_dual_func(env_warm);
-   // print_dual_function(env_warm);
+   print_dual_function(env_warm);
    sym_evaluate_dual_function(env_warm, rhs, 0, &dualFuncObj);
    sym_get_obj_val(env_warm, &warmObjVal);
    printf(" DF: %.10f\n", dualFuncObj);
    printf("RVF: %.10f\n", warmObjVal);
 
-   double zeta[3] = {-1285.000, -963.750, -803.125}; // -642.500, -481.875, -321.250, -160.625, 0.000};
+   double zeta[8] = {-1285.000, -963.750, -803.125  -642.500, -481.875, -321.250, -160.625, 0.000};
 
-   for (int i = 0; i < 3; i++){
+   for (int i = 0; i < 8; i++){
       printf("======================================\n");
       rhs[0] = zeta[i];
 
@@ -149,10 +149,13 @@ int main(int argc, char **argv)
 
       sym_build_dual_func(env_warm);
       sym_evaluate_dual_function(env_warm, rhs, 1, &dualFuncObj);
-      // print_dual_function(env_warm);
+      print_dual_function(env_warm);
       sym_get_obj_val(env_warm, &warmObjVal);
       printf(" DF: %.10f\n", dualFuncObj);
       printf("RVF: %.10f\n", warmObjVal);
+      if (sym_is_proven_optimal(env_warm) && fabs(dualFuncObj - warmObjVal) > 0.0001){
+         printf("WARNING: Dual function not strong!\n");
+      }
    }
    
    // // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);

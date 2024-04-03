@@ -576,11 +576,16 @@ void send_node_desc(lp_prob *p, int node_type)
 	 }
 	 n->duals = p->dualsol;
 	 p->dualsol = NULL;
-	 //Anahita
-	 if (node_type == INFEASIBLE_PRUNED){
-	    if (n->rays){
+   //  This must be always done
+   //  to keep the tree clean throughout warm_solve()'s 
+    if (n->rays){
 	       FREE(n->rays);
-	    }
+      }
+	 //Anahita
+	 if (node_type == INFEASIBLE_PRUNED ||
+   //  feb223
+   //  A ray may also be discovered on OVER_UB_PRUNED
+        node_type == OVER_UB_PRUNED){
        if (p->raysol){
          n->rays = p->raysol;
 	      p->raysol = NULL;
