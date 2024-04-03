@@ -1643,7 +1643,7 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 			// if (p->bc_index == 37)
 			// 	if(can->position == 78 && can->rhs[j] == 1)
 			// 	{
-			// 		// lp_data->si->setLogLevel(63);
+			// 		lp_data->si->setLogLevel(63);
 			// 		printf("here!\n");
 			// 	}
 		     can->termcode[j] = solve_hotstart(lp_data, can->iterd+j);
@@ -1653,7 +1653,7 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
 			// if (p->bc_index == 37)
 			// 	if(can->position == 78 && can->rhs[j] == 1)
 			// 	{
-			// 		// lp_data->si->setLogLevel(63);
+			// 		lp_data->si->setLogLevel(63);
 			// 		printf("here!\n");
 			// 	}
 		     load_basis(lp_data, cstat, rstat);
