@@ -3888,7 +3888,8 @@ void get_dual_ray(LPdata *lp_data)
       }
 
       if (farkasProof < -1e-5){
-         printf("Farkas Proof Failing!\n");
+         printf("Warning: get_dual_rays():\n");
+         printf("  Farkas Proof Failing!\n");
       }
       // assert(farkasProof > 1e-5);
       

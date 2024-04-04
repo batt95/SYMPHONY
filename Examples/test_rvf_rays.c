@@ -127,13 +127,17 @@ int main(int argc, char **argv)
    sym_evaluate_dual_function(env_warm, rhs, 0, &dualFuncObj);
    sym_get_obj_val(env_warm, &warmObjVal);
    printf(" DF: %.10f\n", dualFuncObj);
-   printf("RVF: %.10f\n", warmObjVal);
+   if (sym_is_proven_optimal(env_warm))
+      printf("RVF: %.10f\n", warmObjVal);
+   else
+      printf("RVF: INFEASIBLE\n");
 
-   double zeta[8] = {-1285.000, -963.750, -803.125  -642.500, -481.875, -321.250, -160.625, 0.000};
+   double zeta[9] = {-1285.000, -963.750, -803.125,  -642.500, -481.875, -321.250, -160.625, 0.000, -2800};
 
-   for (int i = 0; i < 8; i++){
-      printf("======================================\n");
+   for (int i = 0; i < 9; i++){
       rhs[0] = zeta[i];
+      printf("======================================\n");
+      printf("         %.3f            \n", rhs[0]);
 
       set_rhs(env_warm, rhs, num_objs);
       
@@ -152,7 +156,10 @@ int main(int argc, char **argv)
       print_dual_function(env_warm);
       sym_get_obj_val(env_warm, &warmObjVal);
       printf(" DF: %.10f\n", dualFuncObj);
-      printf("RVF: %.10f\n", warmObjVal);
+      if (sym_is_proven_optimal(env_warm))
+         printf("RVF: %.10f\n", warmObjVal);
+      else
+         printf("RVF: INFEASIBLE\n");
       if (sym_is_proven_optimal(env_warm) && fabs(dualFuncObj - warmObjVal) > 0.0001){
          printf("WARNING: Dual function not strong!\n");
       }

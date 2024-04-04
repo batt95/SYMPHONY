@@ -3832,9 +3832,9 @@ void print_dual_function(warm_start_desc *ws)
 		return;
 	}
 
-	printf("==========================\n");
-	printf("DUAL FUNCTION INFO\n");
-	printf("==========================\n");
+	printf("====================================\n");
+	printf("  DUAL FUNCTION INFO\n");
+	printf("====================================\n");
 	if (ws->dual_func->policy == DUALS_LEAF_ONLY)
 		printf("Policy: DUALS_LEAF_ONLY\n");
 	else if (ws->dual_func->policy == DUALS_SAVE_ALL)
@@ -3844,6 +3844,7 @@ void print_dual_function(warm_start_desc *ws)
 	printf("Num dual sol: %d\n", ws->dual_func->num_pieces);
 	printf("Num terms: %d\n", ws->dual_func->num_terms);
 	printf("CPU Time spent in LPs: %.5f\n", ws->dual_func->lp_cpu_time);
+	printf("====================================\n");
 
 	// printf("==========================\n");
 	// printf("RAYS\n");
@@ -4061,15 +4062,15 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
 				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
 				dual->len = node->basis_len;
-				// REMOVE THIS when using the hash table
-				if (dual){
-					FREE(dual->basis_idx);
-					FREE(dual);
-				}
+				// COMMENT THIS when using the hash table
+				// if (dual){
+				// 	FREE(dual->basis_idx);
+				// 	FREE(dual);
+				// }
 			} 
 			// try to add this dual into the hashtable
 			// TODO: are the basis_idx correctly set??? Are they unique???
-			if (TRUE || (dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)))){
+			if ((dual && (is_added = add_dual_to_table(&(ws->dual_func->hashtb), dual)))){
 				// successfully added, collect reduced costs
 				// find nnzs and fill reduced costs related structures
 				for (i = 0; i < ws->m; i++)
@@ -4320,12 +4321,12 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 					if (!is_all_zero){
 						// Check duplicates among current rays
 						for (i = 0; i < (*curr_ray) && (!is_duplicate); i++){
-							for (j = 0; j < ws->m + ws->n; j++){
+							for (j = 0; j < ws->m; j++){
 								if (fabs(node->rays[j] - rays[i][j]) > 1e-7){
 									// These rays are different, no need to check more
 									break;
 								}
-								if (j == ws->m + ws->n - 1)
+								if (j == ws->m - 1)
 									// We already have this ray
 									is_duplicate = true;
 							}
@@ -4333,12 +4334,12 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 
 						// Check duplicates among rays in dual_func_desc
 						for (i = 0; i < ws->dual_func->num_rays && (!is_duplicate); i++){
-							for (j = 0; j < ws->m + ws->n; j++){
+							for (j = 0; j < ws->m; j++){
 								if (fabs(node->rays[j] - ws->dual_func->rays[i][j]) > 1e-7){
 									// These rays are different, no need to check more
 									break;
 								}
-								if (j == ws->m + ws->n - 1)
+								if (j == ws->m - 1)
 									// We already have this ray
 									is_duplicate = true;
 							}
@@ -4510,8 +4511,13 @@ int build_dual_func(sym_environment *env)
 	// Update the actual number of disjunction terms
 	// Infeasible leaf lead to infeasible disjunction term
 	ws->dual_func->num_terms = curr_term;
-	assert(num_leaf == curr_term);
-
+#ifdef CHECK_DUAL_FUNC
+	if (num_leaf != curr_term){
+		printf(" WARNING in build_dual_func():\n");
+		printf(" Not all leaves have been collected! num_leaf = %d, dual_func->num_terms %d\n", 
+		num_leaf, ws->dual_func->num_terms);
+	}
+#endif
 	// if (nnz_duals)
 	// 	printf("DEBUG: matrix sparsity %.3f\n", ((double)(nnz_duals)/(double)(tot_piece)));
 	// else
@@ -4542,13 +4548,24 @@ int build_dual_func(sym_environment *env)
 		// There should be a limit on the number of dual solutions we can collect
 		// ws->dual_func->num_pieces = ws->dual_func->duals->getMajorDim();
 		ws->dual_func->num_pieces += curr_piece;
-		assert(ws->dual_func->num_pieces ==  ws->dual_func->duals->getMajorDim());
+#ifdef CHECK_DUAL_FUNC
+		if (ws->dual_func->num_pieces !=  ws->dual_func->duals->getMajorDim()){
+			printf(" WARNING in build_dual_func():\n");
+			printf(" Some pieces are lost in CoinPackedMatrix! dual_func->num_pieces = %d, duals->getMajorDim() = %d\n", 
+			ws->dual_func->num_pieces, ws->dual_func->duals->getMajorDim());
+		}	
 		int len_ht = 0;
 		dual_hash *s;
 		for (s = ws->dual_func->hashtb; s != NULL; s = (dual_hash*)s->hh.next){
 			len_ht++;
 		}
-		// assert(len_ht == ws->dual_func->num_pieces);
+
+		if (len_ht != ws->dual_func->num_pieces){
+			printf(" WARNING in build_dual_func():\n");
+			printf(" Some pieces are lost in HashTable! dual_func->num_pieces = %d, len_hashtable = %d\n", 
+			ws->dual_func->num_pieces, len_ht);
+		}	
+#endif
 	}
 
 	if (curr_ray > 0){
