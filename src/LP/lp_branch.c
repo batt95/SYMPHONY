@@ -250,8 +250,9 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
    st_time     = used_time(&total_time);
    total_iters = 0;
 
-   int *cstat = lp_data->tmp.i1;
-   int *rstat = lp_data->tmp.i2;
+   // Where should we free this ???
+   int *cstat = (int*)malloc(lp_data->maxn * ISIZE); //lp_data->tmp.i1;
+   int *rstat = (int*)malloc(lp_data->maxm * ISIZE); //lp_data->tmp.i2;
 
    get_basis(lp_data, cstat, rstat);
       
@@ -1640,22 +1641,10 @@ int select_branching_object(lp_prob *p, int *cuts, branch_obj **candidate)
                /* The original basis is in lp_data->lpbas */
 	       if (!p->par.cuts_strong_branch){
 		  if (should_use_hot_starts) {
-			// if (p->bc_index == 37)
-			// 	if(can->position == 78 && can->rhs[j] == 1)
-			// 	{
-			// 		lp_data->si->setLogLevel(63);
-			// 		printf("here!\n");
-			// 	}
 		     can->termcode[j] = solve_hotstart(lp_data, can->iterd+j);
 		     total_iters+=*(can->iterd+j);
 		     
 		  } else {
-			// if (p->bc_index == 37)
-			// 	if(can->position == 78 && can->rhs[j] == 1)
-			// 	{
-			// 		lp_data->si->setLogLevel(63);
-			// 		printf("here!\n");
-			// 	}
 		     load_basis(lp_data, cstat, rstat);
 			 // feb223: this is a problematic call, since CLP may
 			// do primal simplex and if iter limit is hit, then we 

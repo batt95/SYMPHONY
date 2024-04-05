@@ -3255,8 +3255,14 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       lp_data->objval = si->getObjValue();
 
 #ifdef CHECK_DUAL_SOLUTION
-      // if (fabs(lp_data->objval - (-1271.50000)) < 0.0001)
-      //    printf("here!\n");
+      // if (fabs(lp_data->objval - (-1271.50000)) < 0.0001){
+      //    int *cstat = (int *)malloc(ISIZE * lp_data->n);
+      //    int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      //    get_basis(lp_data, cstat, rstat);
+
+      //    FREE(cstat);
+      //    FREE(rstat);
+      // }
       check_dual_solution(lp_data->si);
       switch (term)
       {
@@ -3429,8 +3435,14 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
       lp_data->objval = si->getObjValue();
 
 #ifdef CHECK_DUAL_SOLUTION
-      // if (fabs(lp_data->objval - (-1271.50000)) < 0.0001)
-      //    printf("here!\n");
+      // if (fabs(lp_data->objval - (-1271.50000)) < 0.0001){
+      //    int *cstat = (int *)malloc(ISIZE * lp_data->n);
+      //    int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      //    get_basis(lp_data, cstat, rstat);
+
+      //    FREE(cstat);
+      //    FREE(rstat);
+      // }
       check_dual_solution(lp_data->si);
       switch (term)
       {

@@ -4976,11 +4976,12 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 TERM_EVAL_DUAL_FUNC:
 
 	// Assuming minimization here ???
-	// TODO: global_best_bound may be fractional
-	// if (granularity > 1e-5 && // granularity is 1.0 or 2.0, ...
-	//     fabs(floor(global_best_bound + 0.5) - global_best_bound) > 1e-5){
-	// 	global_best_bound = round(global_best_bound / granularity) * granularity;
-	// }
+	// TODO: Check this!!
+	if (granularity > 1e-5 && // granularity is 1.0 or 2.0, ...
+	    fabs(floor(global_best_bound + 0.5) - global_best_bound) > 1e-5){
+		global_best_bound = ceil(global_best_bound / granularity) * granularity;
+		global_best_bound = floor(global_best_bound + 0.5);
+	}
 	*dual_bound = global_best_bound;
 
 	FREE(rhs_times_pi);
