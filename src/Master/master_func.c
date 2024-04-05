@@ -36,7 +36,7 @@
 #include "sym_tm.h"
 
 // #define DEBUG_DUAL_FUNC
-#define CHECK_DUAL_FUNC
+// #define CHECK_DUAL_FUNC
 
 /*===========================================================================*/
 /*===========================================================================*/
@@ -3986,6 +3986,10 @@ int add_dual_to_table(dual_hash **hashtb, dual_hash *toAdd){
 // int count_leaf = 0;
 // int optimal_leaf_found = 0;
 
+#ifdef CHECK_DUAL_FUNC
+	int count_leaf = 0;
+#endif
+
 void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 				  branch_desc *bpath, int* curr_term, int* curr_piece, int* curr_ray, double** rays,
 				  int *duals_index_row, int *duals_index_col, double *duals_val,
@@ -4357,6 +4361,35 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 
 #ifdef CHECK_DUAL_FUNC
 			// Let's do some checks
+			// Dual Obj Value of this node 
+			if (!lb)
+				lb = (double *)malloc(DSIZE * ws->n);
+
+			if (!ub)
+				ub = (double *)malloc(DSIZE * ws->n);
+
+			memcpy(lb, mip->lb, DSIZE * ws->n);
+			memcpy(ub, mip->ub, DSIZE * ws->n);
+
+			change_lbub_from_disj(lb, ub, ws->n, ws->dual_func->disj + ((*curr_term) - 1));
+			
+			dualobj = 0;
+			for (int i = 0; i < ws->m; i++){
+				dualobj += mip->rhs[i] * node->duals[i];
+			}
+			for (int i = 0; i < ws->n; i++){
+				if (node->dj[i] > 1e-5)
+					dualobj += lb[i] * node->dj[i];
+				else if (node->dj[i] < -1e-5)
+					dualobj += ub[i] * node->dj[i];
+			}
+			// if (count_leaf == 85)
+			// 	if (node->rays)
+			// 		printf("Has ray! %.5f\n", ray_times_b);
+			printf(" - %d Fesibility status of this leaf: %d\n", count_leaf, node->feasibility_status);
+			printf("   %d Lower bound at this leaf: %.5f\n", count_leaf, node->lower_bound);
+			printf("   %d Dual Obj Val at this leaf: %.5f\n", count_leaf++, dualobj);
+			reset_lbub_from_disj(lb, ub, mip->lb, mip->ub, ws->n, ws->dual_func->disj + ((*curr_term) - 1));
 			if (node->feasibility_status == INFEASIBLE_PRUNED){
 				// There must be a ray checking its primal infeasibility
 				if (node->rays){
@@ -4377,36 +4410,16 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 					}
 				} else {
 					// ... or the dual obj value is over the UB
-					// Dual Obj Value of this node 
-					if (!lb)
-						lb = (double *)malloc(DSIZE * ws->n);
-
-					if (!ub)
-						ub = (double *)malloc(DSIZE * ws->n);
-
-					memcpy(lb, mip->lb, DSIZE * ws->n);
-					memcpy(ub, mip->ub, DSIZE * ws->n);
-
-					change_lbub_from_disj(lb, ub, ws->n, ws->dual_func->disj + ((*curr_term) - 1));
-					
-					dualobj = 0;
-					for (int i = 0; i < ws->m; i++){
-						dualobj += mip->rhs[i] * node->duals[i];
-					}
-					for (int i = 0; i < ws->n; i++){
-						if (node->dj[i] > 1e-5)
-							dualobj += lb[i] * node->dj[i];
-						else if (node->dj[i] < -1e-5)
-							dualobj += ub[i] * node->dj[i];
-					}
 					if (dualobj + ws->dual_func->granularity - ws->ub < 1e-5){
 						printf(" WARNING in collect_duals():\n");
+						printf( "bc node %d :", node->bc_index);
 						printf("  OVER_UB_PRUNED: dual obj val not over UB!\n");
 						printf("  dualobj = %.5f < %.5f = UB\n", dualobj, ws->ub);
 					}
-					reset_lbub_from_disj(lb, ub, mip->lb, mip->ub, ws->n, ws->dual_func->disj + ((*curr_term) - 1));
 				}	
 			} 
+			
+
 #endif
 			FREE(lb);
 			FREE(ub);
@@ -4424,7 +4437,9 @@ int build_dual_func(sym_environment *env)
 {
 
 #ifdef SENSITIVITY_ANALYSIS
-	// count_leaf = 0;
+#ifdef CHECK_DUAL_FUNC
+	count_leaf = 0;
+#endif
 	warm_start_desc *ws = env->warm_start;
 	MIPdesc *mip = env->mip;
 	ws->m = mip->m;
@@ -4836,7 +4851,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				if (is_term_feas[t]){
 					// This case could happen when the leaf is OVER_UB_PRUNED
 					// and CLP stopped before proving dual unboundedness. 
-					// This is OK, we have the appropriate dual solution
+					// This is OK, as long as we have the appropriate dual solution
 
 					// printf("Warning: FarkasProof not working!\n");
 					// is_term_feas[t] = FALSE;
@@ -4933,18 +4948,27 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				(rhs_times_pi_plus_dj > local_best_bound)){
 				local_best_bound = rhs_times_pi_plus_dj;
 			} 
-
+			// if (t == 146){
+			// 	printf("local_best_bound: %.5f\n", local_best_bound);
+			// }
 		}
 
 #ifdef DEBUG_DUAL_FUNC
-		// This assertion may fail since CLP might have stopped
-		// the solution of LPs prematurely due to the curr UB in the Tree
-		// but this is not a problem
+		// Equality with sanity_objVal may not hold since
+		// CLP might have stopped the solution of LPs prematurely 
+		// due to the curr UB in the Tree but this is not a problem.
+		// Hence we check that local_best_bound 
+		// is a valid dual bound to sanity_objVal
 		assert((local_best_bound - sanity_objVal) < 0.001);
 #endif	
-		if (local_best_bound - global_best_bound < -1e-7){ //  - granularity
+		
+		if (fabs(local_best_bound - global_best_bound) > 1e-5 && // Not equals
+		    local_best_bound < global_best_bound){ 
 			global_best_bound = local_best_bound;
 		}
+
+		// if (t <= 146)
+		// 	printf("t = %d, global_best_bound: %.5f\n", t, global_best_bound);
 
 		reset_lbub_from_disj(lb, ub, mip->lb, mip->ub, ws->n, disj);
 	}
@@ -4952,7 +4976,12 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 TERM_EVAL_DUAL_FUNC:
 
 	// Assuming minimization here ???
-	*dual_bound = floor(global_best_bound + granularity);
+	// TODO: global_best_bound may be fractional
+	// if (granularity > 1e-5 && // granularity is 1.0 or 2.0, ...
+	//     fabs(floor(global_best_bound + 0.5) - global_best_bound) > 1e-5){
+	// 	global_best_bound = round(global_best_bound / granularity) * granularity;
+	// }
+	*dual_bound = global_best_bound;
 
 	FREE(rhs_times_pi);
 	FREE(dj_start);
