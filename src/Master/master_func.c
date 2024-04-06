@@ -4280,6 +4280,8 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 							(*curr_ray)++;
 						}
 					}
+					
+					FREE(rayA);
 				}
 			}
 

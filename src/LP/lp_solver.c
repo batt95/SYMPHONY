@@ -3965,6 +3965,13 @@ void get_dual_ray(LPdata *lp_data)
       memcpy(lp_data->raysol, ray, (lp_data->maxm) * DSIZE);
 
       lp_data->has_ray = TRUE;
+      
+      if (vRays[0]){
+         delete[] vRays[0];
+      } else {
+         FREE(ray);
+      }
+      ray = NULL;
    }
 }
 
