@@ -63,6 +63,8 @@ void free_lp_arrays(LPdata *lp_data)
    FREE(lp_data->slacks);
    // feb223
    FREE(lp_data->basis_idx);
+   FREE(lp_data->cstat);
+   FREE(lp_data->rstat);
 
    FREE(lp_data->random_hash);
    FREE(lp_data->hashes);
@@ -223,6 +225,8 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          FREE(lp_data->basis_idx);
          lp_data->basis_idx = (int *)malloc((lp_data->m) * ISIZE);
          lp_data->basis_len = 0;
+         FREE(lp_data->rstat);
+         lp_data->rstat = (int *)malloc((lp_data->maxm) * ISIZE);
       }
       else
       {
@@ -242,6 +246,10 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          lp_data->basis_idx = (int *)realloc((void *)lp_data->basis_idx,
                                     (lp_data->m) * ISIZE);
          lp_data->basis_len = 0;
+
+         lp_data->rstat = (int *)realloc((void *)lp_data->rstat,
+                                    (lp_data->maxm) * ISIZE);
+
       }
       /* rows is realloc'd in either case just to keep the base constr */
       lp_data->rows = (row_data *)realloc((char *)lp_data->rows,
@@ -266,6 +274,9 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          lp_data->heur_solution = (double *)malloc(lp_data->maxn * DSIZE);
          FREE(lp_data->col_solution);
          lp_data->col_solution = (double *)malloc(lp_data->maxn * DSIZE);
+         // feb223
+         FREE(lp_data->cstat);
+         lp_data->cstat = (int *)malloc((lp_data->maxn) * ISIZE);
 #ifdef __CPLEX__
          FREE(lp_data->lb);
          lp_data->lb = (double *)malloc(lp_data->maxn * DSIZE);
@@ -289,6 +300,9 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          lp_data->col_solution = (double *)realloc((char *)
                                                        lp_data->col_solution,
                                                    lp_data->maxn * DSIZE);
+         // feb223
+         lp_data->cstat = (int *)realloc((void *)lp_data->cstat,
+                                    (lp_data->maxn) * ISIZE);
 #ifdef __CPLEX__
          lp_data->lb = (double *)realloc((char *)lp_data->lb,
                                          lp_data->maxn * DSIZE);

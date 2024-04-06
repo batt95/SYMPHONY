@@ -233,6 +233,9 @@ typedef struct LPDATA{
 
    int        *frac_var_cnt;
 
+   int        *cstat; /* to be used in branching to save the basis */
+   int        *rstat;
+
 }LPdata;
 
 /*****************************************************************************/
