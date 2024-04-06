@@ -216,14 +216,14 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          // Anahita
          FREE(lp_data->raysol);
          // lp_data->raysol = (double *)malloc(lp_data->maxm * DSIZE);
-         lp_data->raysol = (double *)malloc((lp_data->m + lp_data->n) * DSIZE);
+         lp_data->raysol = (double *)malloc((lp_data->maxm) * DSIZE);
          lp_data->has_ray = FALSE;
          //
          FREE(lp_data->slacks);
          lp_data->slacks = (double *)malloc(lp_data->maxm * DSIZE);
          // feb223
          FREE(lp_data->basis_idx);
-         lp_data->basis_idx = (int *)malloc((lp_data->m) * ISIZE);
+         lp_data->basis_idx = (int *)malloc((lp_data->maxm) * ISIZE);
          lp_data->basis_len = 0;
          FREE(lp_data->rstat);
          lp_data->rstat = (int *)malloc((lp_data->maxm) * ISIZE);
@@ -236,15 +236,14 @@ void size_lp_arrays(LPdata *lp_data, char do_realloc, char set_max,
          // lp_data->raysol = (double *)realloc((char *)lp_data->raysol,
          //                                     lp_data->maxm * DSIZE);
          lp_data->raysol = (double *)realloc((char *)lp_data->raysol,
-                                             (lp_data->m + 
-                                             lp_data->n) * DSIZE);
+                                             (lp_data->maxm) * DSIZE);
                                              
          //
          lp_data->slacks = (double *)realloc((void *)lp_data->slacks,
                                              lp_data->maxm * DSIZE);
          // feb223
          lp_data->basis_idx = (int *)realloc((void *)lp_data->basis_idx,
-                                    (lp_data->m) * ISIZE);
+                                    (lp_data->maxm) * ISIZE);
          lp_data->basis_len = 0;
 
          lp_data->rstat = (int *)realloc((void *)lp_data->rstat,
@@ -3155,10 +3154,10 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
 
       // feb223
       int len = 0;
-      int *cstat = (int *)malloc(ISIZE * lp_data->n);
-      int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      int *cstat = (int *)malloc(ISIZE * lp_data->maxn);
+      int *rstat = (int *)malloc(ISIZE * lp_data->maxm);
       get_basis(lp_data, cstat, rstat);
-      for (int i = 0; i < lp_data->n; i++){
+      for (int i = 0; i < lp_data->maxn; i++){
          if(cstat[i] == VAR_BASIC){
             lp_data->basis_idx[len] = i;
             len++;
@@ -3166,17 +3165,14 @@ int initial_lp_solve(LPdata *lp_data, int *iterd)
       }
       for (int i = 0; i < lp_data->m; i++){
          if(rstat[i] == VAR_BASIC){
-            lp_data->basis_idx[len] = lp_data->n + i;
+            lp_data->basis_idx[len] = lp_data->maxn + i;
             len++;
          }
       }
       lp_data->basis_len = len;
 
-      assert(len == lp_data->m);
-
       FREE(cstat);
       FREE(rstat);
-      
 
       lp_data->lp_is_modified = LP_HAS_NOT_BEEN_MODIFIED;
    }
@@ -3369,10 +3365,10 @@ int dual_simplex(LPdata *lp_data, int *iterd)
 
       // feb223
       int len = 0;
-      int *cstat = (int *)malloc(ISIZE * lp_data->n);
-      int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      int *cstat = (int *)malloc(ISIZE * lp_data->maxn);
+      int *rstat = (int *)malloc(ISIZE * lp_data->maxm);
       get_basis(lp_data, cstat, rstat);
-      for (int i = 0; i < lp_data->n; i++){
+      for (int i = 0; i < lp_data->maxn; i++){
          if(cstat[i] == VAR_BASIC){
             lp_data->basis_idx[len] = i;
             len++;
@@ -3380,7 +3376,7 @@ int dual_simplex(LPdata *lp_data, int *iterd)
       }
       for (int i = 0; i < lp_data->m; i++){
          if(rstat[i] == VAR_BASIC){
-            lp_data->basis_idx[len] = lp_data->n + i;
+            lp_data->basis_idx[len] = lp_data->maxn + i;
             len++;
          }
       }
@@ -3549,10 +3545,10 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
 
       // feb223
       int len = 0;
-      int *cstat = (int *)malloc(ISIZE * lp_data->n);
-      int *rstat = (int *)malloc(ISIZE * lp_data->m);
+      int *cstat = (int *)malloc(ISIZE * lp_data->maxn);
+      int *rstat = (int *)malloc(ISIZE * lp_data->maxm);
       get_basis(lp_data, cstat, rstat);
-      for (int i = 0; i < lp_data->n; i++){
+      for (int i = 0; i < lp_data->maxn; i++){
          if(cstat[i] == VAR_BASIC){
             lp_data->basis_idx[len] = i;
             len++;
@@ -3560,7 +3556,7 @@ int solve_hotstart(LPdata *lp_data, int *iterd)
       }
       for (int i = 0; i < lp_data->m; i++){
          if(rstat[i] == VAR_BASIC){
-            lp_data->basis_idx[len] = lp_data->n + i;
+            lp_data->basis_idx[len] = lp_data->maxn + i;
             len++;
          }
       }
@@ -3819,11 +3815,11 @@ void get_dj_pi(LPdata *lp_data)
    const double *lower = lp_data->si->getColLower();
    const double *upper = lp_data->si->getColUpper();
    double *dj = lp_data->dj;
-   int numberColumns = lp_data->n;
+   int numberColumns = lp_data->maxn;
    int t;
    memcpy(lp_data->dualsol, lp_data->si->getRowPrice(), lp_data->m * DSIZE);
    pi = lp_data->dualsol;
-   memcpy(dj, lp_data->si->getReducedCost(), lp_data->n * DSIZE);
+   memcpy(dj, lp_data->si->getReducedCost(), lp_data->maxn * DSIZE);
    /* djs may not be correct on fixed variables */
    /* fix assumes minimization */
    for (t = 0; t < numberColumns; t++)
@@ -3848,91 +3844,127 @@ void get_dj_pi(LPdata *lp_data)
 void get_dual_ray(LPdata *lp_data)
 {
    std::vector<double *> vRays;
-   vRays = lp_data->si->getDualRays(1, true);
-   
-   // vRays = lp_data->si->getDualRays(1, false);
+   vRays = lp_data->si->getDualRays(1, false);
 
    // check that there is at least one ray
    int raysReturned = static_cast<unsigned int>(vRays.size());
-   assert(raysReturned == 1);
+   // assert(raysReturned == 1);
 
-   //   double* ray = (double*) malloc (lp_data->m * DSIZE *
-   // sizeof(double));
+   double *ray;
+   int i;
+   bool is_ray_empty = TRUE;
+   double norm = 0;
 
-   if (vRays[0])
+   if (raysReturned && vRays[0]){
+      ray = vRays[0];
+      lp_data->has_ray = TRUE;
+   } 
+   else
    {
-      double *ray = vRays[0];
+      ray = NULL;
+      lp_data->has_ray = FALSE;
+
+#ifdef SENSITIVITY_ANALYSIS
+      // CLP proved infeasibility in other ways
+      // Try and find a ray by solving a subproblem
+      /*
+      Given the infeasible LP: 
+                    min cx
+                   s.t. Ax <= b,
+                    l <= x <= u
+      
+      Solve:        min s
+                   s.t. Ax - s <= b,
+                    l <= x <= u
+                         s >= 0
+      
+      And collect the duals.
+      
+      */
+      OsiClpSolverInterface solver(*(lp_data->si));
+
+      int *index = new int[CoinMax(lp_data->maxn, lp_data->maxm)];
       int i;
-      bool is_ray_empty = TRUE;
-      // if (ray[1] < -1e-5){
-      //    printf("here\n");
-      //    lp_data->si->getModelPtr()->writeLp("strange_ray_clp", "lp");
-      //    write_lp(lp_data, "strange_ray_symp");
-      // }
-      const double *inverseRowScale = lp_data->si->getModelPtr()->inverseRowScale();
-      const double *rowScale = lp_data->si->getModelPtr()->rowScale();
-      double *rayA = (double *)malloc(sizeof(double) * lp_data->n);
+      for (i = CoinMax(lp_data->maxn, lp_data->maxm) - 1; i >= 0; --i) {
+         index[i] = i;
+      }
+      double *obj = new double[CoinMax(lp_data->maxn, 2 * lp_data->maxm)];
+      CoinFillN(obj, lp_data->maxn, 0.0);
+      solver.setObjCoeffSet(index, index + lp_data->maxn, obj);
 
-      const CoinPackedMatrix *A = lp_data->si->getMatrixByCol();
-      // A->dumpMatrix();
-      double norm = 0;
+      double *clb = new double[2 * lp_data->maxm];
+      double *cub = new double[2 * lp_data->maxm];
 
-      for (i = 0; i < lp_data->m; i++)
+      const double plusone = 1.0;
+      const double minusone = -1.0;
+      const char *sense = lp_data->si->getRowSense();
+
+      const CoinPackedVectorBase **cols = new const CoinPackedVectorBase *[lp_data->maxm];
+      int newcols = 0;
+      for (i = 0; i < lp_data->maxm; ++i) {
+         switch (sense[i]) {
+         case 'L':
+         cols[newcols++] = new CoinShallowPackedVector(1, &index[i], &minusone, false);
+         break;
+         case 'G':
+         cols[newcols++] = new CoinShallowPackedVector(1, &index[i], &plusone, false);
+         break;
+         case 'R':
+         cols[newcols++] = new CoinShallowPackedVector(1, &index[i], &minusone, false);
+         cols[newcols++] = new CoinShallowPackedVector(1, &index[i], &plusone, false);
+         break;
+         case 'N':
+         case 'E':
+         break;
+         }
+      }
+
+      CoinFillN(obj, newcols, 1.0);
+      CoinFillN(clb, newcols, 0.0);
+      CoinFillN(cub, newcols, lp_data->si->getInfinity());
+
+      solver.addCols(newcols, cols, clb, cub, obj);
+      delete[] index;
+      delete[] cols;
+      delete[] clb;
+      delete[] cub;
+      delete[] obj;
+
+      solver.setObjSense(1.0); // minimize
+      solver.initialSolve();
+
+      const double *solverpi = solver.getRowPrice();
+
+      double *lambda = (double *)malloc(lp_data->maxm * DSIZE);
+      
+      for (i = lp_data->maxm - 1; i >= 0; --i) {
+         lambda[i] = -solverpi[i];
+      }
+
+      ray = lambda;
+      lp_data->has_ray = TRUE;
+#endif
+   }
+   
+   if (ray){
+         for (i = 0; i < lp_data->maxm; i++)
       {
          norm += ray[i] * ray[i];
       }
       norm = sqrt(norm);
 
       if (norm > 1e-7){
-         for (i = 0; i < lp_data->m; i++)
+         for (i = 0; i < lp_data->maxm; i++)
          {
             ray[i] /= norm;
          }
       }
-         
-      A->transposeTimes(ray, rayA);
 
       // temp: this assert would fail when cuts exist
       // assert(i < lp_data->m);
-      memcpy(lp_data->raysol, ray, (lp_data->m) * DSIZE);
-      memcpy(lp_data->raysol + lp_data->m, rayA, (lp_data->n) * DSIZE);
+      memcpy(lp_data->raysol, ray, (lp_data->maxm) * DSIZE);
 
       lp_data->has_ray = TRUE;
-
-      double farkasProof = 0;
-
-      for (int i = 0; i < lp_data->m; i++){
-         farkasProof -= lp_data->si->getRightHandSide()[i] * ray[i];
-      }
-
-      for (int j = 0; j < lp_data->n; j++){
-         if (rayA[j] > 1e-5){
-            farkasProof += lp_data->si->getColLower()[j] * rayA[j];
-         } else if (rayA[j] < -1e-5) {
-            farkasProof += lp_data->si->getColUpper()[j] * rayA[j];
-         }
-      }
-
-      if (farkasProof < -1e-5){
-         printf("Warning: get_dual_rays():\n");
-         printf("  Farkas Proof Failing!\n");
-      }
-      // assert(farkasProof > 1e-5);
-      
-
-      // if (ray[1] == -1.00){
-      //    printf("here\n");
-      //    lp_data->si->writeLp("strange_ray", "lp");
-      // }
-      
-      delete[] vRays[0];
-      FREE(rayA);
-   }
-   else
-   {
-      // write_lp(lp_data, "no_ray");
-      double *ray = NULL;
-      lp_data->has_ray = FALSE;
    }
 }
 

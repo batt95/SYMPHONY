@@ -504,9 +504,9 @@ int resolve_node(sym_environment *env, bc_node *node)
 		{
 			if (!node->rays)
 			{
-				node->rays = (double *)malloc((lp_data->m + lp_data->n) * DSIZE);
+				node->rays = (double *)malloc((lp_data->maxm) * DSIZE);
 			}
-			memcpy(node->rays, lp_data->raysol, (lp_data->m + lp_data->n) * DSIZE);
+			memcpy(node->rays, lp_data->raysol, (lp_data->maxm) * DSIZE);
 		}
 #endif
 	}
@@ -4196,125 +4196,48 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 			// Must collect the ray
 			if ((node->feasibility_status == INFEASIBLE_PRUNED) ||
 				((node->feasibility_status == OVER_UB_PRUNED) && (node->rays))){
+#ifdef CHECK_DUAL_FUNC
 				if ((node->feasibility_status == INFEASIBLE_PRUNED) && !node->rays){
-					// This should never happen now, but if it does, resolve the LP
-					// and get the ray
-#ifdef CHECK_DUAL_FUNC
+					// This should never happen now
 					printf(" WARNING in collect_duals():\n");
-					printf(" Infeasible node without rays! Solving LP...\n");
-#endif
-					clock_t start, end;
-					double cpu_time_used;
-					start = clock();
-					if (!ws->dual_func->si){
-						ws->dual_func->si = new OsiXSolverInterface();
-						ws->dual_func->si->setupForRepeatedUse();
-						ws->dual_func->si->setHintParam(OsiDoReducePrint);
-						ws->dual_func->si->messageHandler()->setLogLevel(0);
-						ws->dual_func->si->setCleanupScaling(1);
-					}
-					ws->dual_func->si->loadProblem(ws->n, ws->m,
-							mip->matbeg, mip->matind,
-							mip->matval, lb,
-							ub, mip->obj,
-							mip->sense, mip->rhs,
-							mip->rngval);
-
-					ws->dual_func->si->initialSolve();
-
-					if (ws->dual_func->si->isProvenPrimalInfeasible()){
-						std::vector<double *> vRays = ws->dual_func->si->getDualRays(1, false);
-						// check that there is at least one ray
-						int raysReturned = static_cast<unsigned int>(vRays.size());
-						assert(raysReturned == 1);	
-						if (vRays[0])
-						{
-							double *ray = vRays[0];
-							int i;
-							bool is_ray_empty = TRUE;
-
-							const double *inverseRowScale = ws->dual_func->si->getModelPtr()->inverseRowScale();
-							const double *rowScale = ws->dual_func->si->getModelPtr()->rowScale();
-							double *rayA = (double *)malloc(sizeof(double) * ws->n);
-
-							A = ws->dual_func->si->getMatrixByCol();
-							
-							double norm = 0;
-
-							for (i = 0; i < ws->m; i++)
-							{
-								if (fabs(ray[i]) > 1e-5){
-									is_ray_empty = FALSE;
-									break;
-								}
-							} 
-
-							if (!is_ray_empty)
-							{	
-								for (i = 0; i < ws->m; i++)
-								{
-									norm += ray[i] * ray[i];
-								}
-								norm = sqrt(norm);
-
-								if (norm > 1e-7){
-									for (i = 0; i < ws->m; i++)
-									{
-										ray[i] /= norm;
-									}
-								}
-									
-								A->transposeTimes(ray, rayA);
-								node->rays = (double *)malloc(sizeof(double) * (ws->n + ws->m));
-								memcpy(node->rays, ray, (ws->m) * DSIZE);
-								memcpy(node->rays + ws->m, rayA, (ws->n) * DSIZE);
-							} else {
-#ifdef CHECK_DUAL_FUNC
-								printf(" WARNING in collect_duals():\n");
-								printf("  Ray is all zeros!\n");
-#endif
-							}
-							
-							delete[] vRays[0];
-							FREE(rayA);
-						}
-						else
-						{
-#ifdef CHECK_DUAL_FUNC
-							printf(" WARNING in collect_duals():\n");
-							printf("  Still no ray after LP solve!\n");
-#endif
-						}
-
-					} else {
-#ifdef CHECK_DUAL_FUNC
-						printf(" WARNING in collect_duals():\n");
-						printf("  This node should not be infeasible!\n");
-#endif
-					}	
-					end = clock();
-					cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-					ws->dual_func->lp_cpu_time += cpu_time_used;
+					printf(" Infeasible node without rays!\n");
 				}
+#endif
 				if (node->rays){
 					bool is_duplicate = false;
 					bool is_all_zero = true;
+					// ray * A
+					double *rayA = (double *)calloc(ws->n, DSIZE);
+					
+					// A is row ordered in MIPdesc
+					int *matbeg = mip->matbeg;
+					int *matind = mip->matind;
+					double *matval = mip->matval;
+					int nz = mip->nz, start, end;
+
+					for (i = 0; i < ws->n; i++){
+						start = matbeg[i];
+						end = (i < ws->n - 1) ? matbeg[i + 1] : nz;
+						for (j = start; j < end; j++){
+							rayA[i] += node->rays[matind[j]] * matval[j];
+						}
+					}
+
 					for (int i = 0; i < ws->m; i++){
 						ray_times_b -= node->rays[i] * mip->rhs[i];
 					}
 
-					for (int i = ws->m; i < ws->m + ws->n; i++){
-						if (node->rays[i] > zerotol){
-							ray_times_b += node->rays[i] * lb[i - ws->m];
+					for (int i = 0; i < ws->n; i++){
+						if (rayA[i] > zerotol){
+							ray_times_b += rayA[i] * lb[i];
 						} 
-						else if (node->rays[i] < -zerotol){
-							ray_times_b += node->rays[i] * ub[i - ws->m];
+						else if (rayA[i] < -zerotol){
+							ray_times_b += rayA[i] * ub[i];
 						}
 					}
 
-					assert(ray_times_b > 1e-5);
 					// Check that the ray is not all zeros
-					for (i = 0; i < ws->m + ws->n; i++)
+					for (i = 0; i < ws->m; i++)
 					{
 						if (fabs(node->rays[i]) > 1e-5){
 							is_all_zero = false;
@@ -4352,7 +4275,8 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 						if (!is_duplicate){
 							// Allocate space for curr ray
 							rays[*curr_ray] = (double *)malloc(DSIZE * (ws->m + ws->n));
-							memcpy(rays[*curr_ray], node->rays, DSIZE * (ws->m + ws->n));
+							memcpy(rays[*curr_ray], node->rays, DSIZE * (ws->m));
+							memcpy(rays[*curr_ray] + ws->m, rayA, DSIZE * (ws->n));
 							(*curr_ray)++;
 						}
 					}
@@ -4361,7 +4285,6 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 
 #ifdef CHECK_DUAL_FUNC
 			// Let's do some checks
-			// Dual Obj Value of this node 
 			if (!lb)
 				lb = (double *)malloc(DSIZE * ws->n);
 
@@ -4373,6 +4296,7 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 
 			change_lbub_from_disj(lb, ub, ws->n, ws->dual_func->disj + ((*curr_term) - 1));
 			
+			// Dual Obj Value of this node 
 			dualobj = 0;
 			for (int i = 0; i < ws->m; i++){
 				dualobj += mip->rhs[i] * node->duals[i];
@@ -4383,9 +4307,7 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 				else if (node->dj[i] < -1e-5)
 					dualobj += ub[i] * node->dj[i];
 			}
-			// if (count_leaf == 85)
-			// 	if (node->rays)
-			// 		printf("Has ray! %.5f\n", ray_times_b);
+
 			printf(" - %d Fesibility status of this leaf: %d\n", count_leaf, node->feasibility_status);
 			printf("   %d Lower bound at this leaf: %.5f\n", count_leaf, node->lower_bound);
 			printf("   %d Dual Obj Val at this leaf: %.5f\n", count_leaf++, dualobj);
@@ -4412,14 +4334,12 @@ void collect_duals(sym_environment *env, bc_node *node, MIPdesc *mip,
 					// ... or the dual obj value is over the UB
 					if (dualobj + ws->dual_func->granularity - ws->ub < 1e-5){
 						printf(" WARNING in collect_duals():\n");
-						printf( "bc node %d :", node->bc_index);
+						printf("  bc node %d :", node->bc_index);
 						printf("  OVER_UB_PRUNED: dual obj val not over UB!\n");
 						printf("  dualobj = %.5f < %.5f = UB\n", dualobj, ws->ub);
 					}
 				}	
 			} 
-			
-
 #endif
 			FREE(lb);
 			FREE(ub);

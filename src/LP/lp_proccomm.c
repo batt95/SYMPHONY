@@ -590,11 +590,6 @@ void send_node_desc(lp_prob *p, int node_type)
          n->rays = p->raysol;
 	      p->raysol = NULL;
        }
-	    
-	   //  if (lp_data->has_ray){
-      //    n->rays = (double *) malloc (DSIZE*(lp_data->n + lp_data->m));
-	   //     memcpy(n->rays, lp_data->raysol, DSIZE*(lp_data->n + lp_data->m));
-	   //  }
 	 }
       }
       if (tm->par.sensitivity_bounds){
@@ -1085,7 +1080,7 @@ void send_node_desc(lp_prob *p, int node_type)
 	 if (lp_data->has_ray){
 	    int have_ray = TRUE;
 	    send_int_array(&have_ray, 1);
-	    send_dbl_array(lp_data->raysol, lp_data->n + lp_data->m);
+	    send_dbl_array(lp_data->raysol, lp_data->maxm);
 	 }else{
 	    int have_ray = FALSE;
 	    send_int_array(&have_ray, 1);
