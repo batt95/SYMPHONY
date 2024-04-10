@@ -25,6 +25,7 @@
 #include "sym_qsort.h"
 
 // #define CHECK_DUAL_SOLUTION
+#define CHECK_DUAL_FUNC
 
 #ifdef PRINT
 #undef PRINT
@@ -3852,14 +3853,56 @@ void get_dual_ray(LPdata *lp_data)
 
    double *ray;
    int i;
-   bool is_ray_empty = TRUE;
+   bool is_ray_empty = TRUE, ray_is_ok = FALSE;
    double norm = 0;
+   double ray_times_b = 0;
+   double *rayA = NULL;
+   const CoinPackedMatrix *A;
 
    if (raysReturned && vRays[0]){
       ray = vRays[0];
-      lp_data->has_ray = TRUE;
+      
+      for (i = 0; i < lp_data->maxm; i++)
+      {
+         norm += ray[i] * ray[i];
+      }
+      norm = sqrt(norm);
+
+      if (norm > 1e-7){
+         for (i = 0; i < lp_data->maxm; i++)
+         {
+            ray[i] /= norm;
+         }
+      }
+
+      rayA = (double *)calloc(lp_data->maxn, DSIZE);
+      A = lp_data->si->getMatrixByCol();
+
+      A->transposeTimes(ray, rayA);
+      for (int i = 0; i < lp_data->maxm; i++){
+         if (lp_data->si->getRowLower()[i] > -1e10){
+            ray_times_b -= lp_data->si->getRowLower()[i] * ray[i];
+         } else {
+            ray_times_b -= lp_data->si->getRowUpper()[i] * ray[i];
+         }
+      }
+      for (int i = 0; i < lp_data->maxn; i++){
+         if (rayA[i] > 1e-5){
+            ray_times_b += lp_data->si->getColLower()[i] * rayA[i];
+         } else if (rayA[i] < -1e-5){
+            ray_times_b += lp_data->si->getColUpper()[i] * rayA[i];
+         }
+      }
+
+     if (ray_times_b > 1e-5){
+         ray_is_ok = TRUE;
+         lp_data->has_ray = TRUE;
+      } else {
+         ray_is_ok = FALSE;
+      }
    } 
-   else
+   
+   if (!ray_is_ok)
    {
       ray = NULL;
       lp_data->has_ray = FALSE;
@@ -3947,7 +3990,8 @@ void get_dual_ray(LPdata *lp_data)
    }
    
    if (ray){
-         for (i = 0; i < lp_data->maxm; i++)
+      norm = 0;
+      for (i = 0; i < lp_data->maxm; i++)
       {
          norm += ray[i] * ray[i];
       }
@@ -3964,6 +4008,36 @@ void get_dual_ray(LPdata *lp_data)
       // assert(i < lp_data->m);
       memcpy(lp_data->raysol, ray, (lp_data->maxm) * DSIZE);
 
+#ifdef CHECK_DUAL_FUNC
+      // Check Farkas proof applies to ray
+      // ray * A
+      ray_times_b = 0;
+      if (!rayA)
+         rayA = (double *)calloc(lp_data->maxn, DSIZE);
+      A = lp_data->si->getMatrixByCol();
+
+      A->transposeTimes(ray, rayA);
+      for (int i = 0; i < lp_data->maxm; i++){
+         if (lp_data->si->getRowLower()[i] > -1e10){
+            ray_times_b -= lp_data->si->getRowLower()[i] * ray[i];
+         } else {
+            ray_times_b -= lp_data->si->getRowUpper()[i] * ray[i];
+         }
+      }
+      for (int i = 0; i < lp_data->maxn; i++){
+         if (rayA[i] > 1e-5){
+            ray_times_b += lp_data->si->getColLower()[i] * rayA[i];
+         } else if (rayA[i] < -1e-5){
+            ray_times_b += lp_data->si->getColUpper()[i] * rayA[i];
+         }
+      }
+
+     if (ray_times_b < 1e-5){
+         printf(" WARNING in get_dual_ray():\n");
+         printf("  Farkas proof at this node doesn't work!\n");
+         // lp_data->si->writeMps("farkas_proof");
+      }
+#endif
       lp_data->has_ray = TRUE;
       
       if (vRays[0]){
@@ -3972,6 +4046,7 @@ void get_dual_ray(LPdata *lp_data)
          FREE(ray);
       }
       ray = NULL;
+      FREE(rayA);
    }
 }
 

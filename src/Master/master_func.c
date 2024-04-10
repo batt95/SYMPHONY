@@ -35,8 +35,8 @@
 // #include "sym_lp.h"
 #include "sym_tm.h"
 
-// #define DEBUG_DUAL_FUNC
-// #define CHECK_DUAL_FUNC
+#define DEBUG_DUAL_FUNC
+#define CHECK_DUAL_FUNC
 
 /*===========================================================================*/
 /*===========================================================================*/
@@ -4607,8 +4607,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	disjunction_desc *disj;
 	CoinBigIndex first = 0, last = 0, j = 0;
 
-	double zerotol = 1e-9;
+	double zerotol = 1e-7;
 	double granularity = ws->dual_func->granularity;
+	double factor = 0;
 	double global_best_bound = SYM_INFINITY;
 	double local_best_bound;
 	double *ray;
@@ -4884,7 +4885,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		assert((local_best_bound - sanity_objVal) < 0.001);
 #endif	
 		
-		if (fabs(local_best_bound - global_best_bound) > 1e-5 && // Not equals
+		if (fabs(local_best_bound - global_best_bound) > zerotol && // Not equals
 		    local_best_bound < global_best_bound){ 
 			global_best_bound = local_best_bound;
 		}
@@ -4897,13 +4898,16 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	
 TERM_EVAL_DUAL_FUNC:
 
-	// Assuming minimization here ???
-	// TODO: Check this!!
-	if (granularity > 1e-5 && // granularity is 1.0 or 2.0, ...
-	    fabs(floor(global_best_bound + 0.5) - global_best_bound) > 1e-5){
-		global_best_bound = ceil(global_best_bound / granularity) * granularity;
-		global_best_bound = floor(global_best_bound + 0.5);
+	// Use granularity to round up the global_best_bound
+	if (granularity > zerotol){ // granularity >= 1
+		factor = granularity + zerotol;
+	} else {
+		factor = granularity;
 	}
+
+	// Assuming minimization here ???
+	global_best_bound = ceil((global_best_bound - zerotol) / factor) * factor;
+	
 	*dual_bound = global_best_bound;
 
 	FREE(rhs_times_pi);
