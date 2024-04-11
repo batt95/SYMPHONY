@@ -3926,6 +3926,8 @@ void get_dual_ray(LPdata *lp_data)
       */
       OsiClpSolverInterface solver(*(lp_data->si));
 
+      solver.setIntParam(OsiMaxNumIteration, LP_MAX_ITER);
+
       int *index = new int[CoinMax(lp_data->maxn, lp_data->maxm)];
       int i;
       for (i = CoinMax(lp_data->maxn, lp_data->maxm) - 1; i >= 0; --i) {

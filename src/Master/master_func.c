@@ -4821,6 +4821,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		change_lbub_from_disj(lb, ub, ws->n, disj);
 
 #ifdef DEBUG_DUAL_FUNC
+		clock_t start, end;
+		double cpu_time_used;
+		start = clock();
 		si->loadProblem(ws->n, ws->m,
 							mip->matbeg, mip->matind,
 							mip->matval, lb,
@@ -4835,6 +4838,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			// Should never happen!
 			sanity_objVal = SYM_INFINITY;
 		}
+		end = clock();
+		cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+		ws->dual_func->lp_cpu_time += cpu_time_used;
 #endif
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
 			// if (i == 173 && t == 22){
