@@ -25,7 +25,7 @@
 #include "sym_qsort.h"
 
 // #define CHECK_DUAL_SOLUTION
-#define CHECK_DUAL_FUNC
+// #define CHECK_DUAL_FUNC
 
 #ifdef PRINT
 #undef PRINT

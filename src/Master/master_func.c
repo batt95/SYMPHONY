@@ -35,8 +35,8 @@
 // #include "sym_lp.h"
 #include "sym_tm.h"
 
-#define DEBUG_DUAL_FUNC
-#define CHECK_DUAL_FUNC
+// #define DEBUG_DUAL_FUNC
+// #define CHECK_DUAL_FUNC
 
 /*===========================================================================*/
 /*===========================================================================*/
