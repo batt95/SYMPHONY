@@ -133,7 +133,9 @@ int main(int argc, char **argv)
       printf("RVF: INFEASIBLE\n");
 
    // double zeta[9] = {-1285.000, -963.750, -803.125,  -642.500, -481.875, -321.250, -160.625, 0.000, -2800};
-   double zeta[9] = {-1681.0, -1470.875, -1050.62,  -642.500, -481.875, -321.250, -160.625, 0.000, -2800};
+   // double zeta[9] = {-1681.0, -1470.875, -1050.62,  -642.500, -481.875, -321.250, -160.625, 0.000, -2800};
+   double zeta[9] = {-2018.0, -1765.75, -1513.5,  -1261.25, -1009, -756.75, -504.5, -252.25, 0};
+
    for (int i = 0; i < 9; i++){
       rhs[0] = zeta[i];
       printf("======================================\n");
@@ -164,158 +166,12 @@ int main(int argc, char **argv)
          printf("WARNING: Dual function not strong!\n");
       }
    }
-   
-   // // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
-
-   // rhs[0] = -55.5;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-      
-   // // Set the new RHS
-   // set_rhs(env_warm, rhs, m);
-
-   // if ((termcode = sym_warm_solve(env_warm)) < 0){
-   //    printf("PROBLEM INFEASIBLE!\n");
-   // }
-
-   // sym_get_obj_val(env_warm, &warmObjVal);
-   // printf("WARM OBJ : %.5f\n", warmObjVal);
-
-   // sym_build_dual_func(env_warm);
-
-   // rhs[0] = 40.0/9.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -55.5;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -73.0/6.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -10;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -73.0/6.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-      
-   // // Set the new RHS
-   // set_rhs(env_warm, rhs, m);
-
-   // if ((termcode = sym_warm_solve(env_warm)) < 0){
-   //    printf("PROBLEM INFEASIBLE!\n");
-   // }
-
-   // sym_get_obj_val(env_warm, &warmObjVal);
-   // printf("WARM OBJ : %.5f\n", warmObjVal);
-
-   // sym_build_dual_func(env_warm);
-
-   // rhs[0] = 40.0/9.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -55.5;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -73.0/6.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -10;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-
-   // rhs[0] = -10;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-      
-   // // Set the new RHS
-   // set_rhs(env_warm, rhs, m);
-
-   // if ((termcode = sym_warm_solve(env_warm)) < 0){
-   //    printf("PROBLEM INFEASIBLE!\n");
-   // }
-
-   // sym_get_obj_val(env_warm, &warmObjVal);
-   // printf("WARM OBJ : %.5f\n", warmObjVal);
-
-   // sym_build_dual_func(env_warm);
-
-   // rhs[0] = 40.0/9.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-   // printf("Dual function evaluates %.7f\n", dualFuncObj);
-
-   // rhs[0] = -55.5;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-   // printf("Dual function evaluates %.7f\n", dualFuncObj);
-
-   // rhs[0] = -73.0/6.0;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-   // printf("Dual function evaluates %.7f\n", dualFuncObj);
-
-   // rhs[0] = -10;
-   // rhs[1] = 4;
-   // rhs[2] = 5;
-   // rhs[3] = 5;
-
-   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-   // printf("Dual function evaluates %.7f\n", dualFuncObj);
-
 
    // Memory clean-ups
    sym_close_environment(env_warm);
    sym_close_environment(env_cold);
 
    free(rhs);
-
-   // free(zeta_lst);
-   // free(rvf_lst);
-   // free(df_lst);
 
    return 0;
 }  
