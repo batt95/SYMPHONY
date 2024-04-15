@@ -924,6 +924,12 @@ typedef struct DUAL_HASH {
     UT_hash_handle hh;        // hashmap handler
 } dual_hash;
 
+typedef struct RAY_HASH {
+    int           *ray; 
+    int            len;       
+    UT_hash_handle hh;        // hashmap handler
+} ray_hash;
+
 typedef struct DISJUNCTION_DESC{
    int            *lbvaridx;     
    double         *lb;
@@ -939,18 +945,21 @@ typedef struct DUAL_FUNC_DESC{
    double              granularity;
    // dual pieces and reduced costs
    // Hash table to keep uniqueness of dual pieces
-   dual_hash          *hashtb;
+   dual_hash          *dhashtb;
    CoinPackedMatrix   *duals;
    int                 num_pieces;
    // dual rays that proves infeasibility
-   double            **rays;
+   ray_hash           *rhashtb;
+   CoinPackedMatrix   *rays;
    int                 num_rays;
    // disjunction description
    disjunction_desc   *disj;
-   int                *feas_stati;
    int                 num_terms; 
    OsiClpSolverInterface *si;
+   // Some statistics
    double              lp_cpu_time;
+   double              rays_cpu_time;
+   double              duals_cpu_time;
 }dual_func_desc;
 
 typedef struct WARM_START_DESC{

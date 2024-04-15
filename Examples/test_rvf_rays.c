@@ -123,8 +123,8 @@ int main(int argc, char **argv)
    }
    
    sym_build_dual_func(env_warm);
-   print_dual_function(env_warm);
    sym_evaluate_dual_function(env_warm, rhs, 0, &dualFuncObj);
+   print_dual_function(env_warm);
    sym_get_obj_val(env_warm, &warmObjVal);
    printf(" DF: %.10f\n", dualFuncObj);
    if (sym_is_proven_optimal(env_warm))
