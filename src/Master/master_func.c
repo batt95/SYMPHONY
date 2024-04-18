@@ -4639,8 +4639,10 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	double factor = 0;
 	double global_best_bound = SYM_INFINITY;
 	double local_best_bound;
-	double *ray;
-	double ray_times_b = 0;
+	double *ray = NULL;
+	double *rhs_times_ray = NULL;
+	int *rayA_start = NULL;
+	double farkasProof = 0;
 	int    is_ray_infty = 0;
 	int *feas_terms = NULL;
 	int is_term_feas = TRUE;
@@ -4742,8 +4744,28 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	
 	if (ws->dual_func->num_rays > 0){
 
+		// Allocate space for rhs * ray 
+		rhs_times_ray = (double *)calloc(ws->dual_func->num_rays, DSIZE);
+		rayA_start = (int *)malloc(ws->dual_func->num_rays * ISIZE);
+
 		const double* elem_r = rays->getElements();
     	const int* indices_r = rays->getIndices();
+
+		// Start by computing rhs * ray
+		for (i = 0; i < ws->dual_func->num_rays; i++){
+			first = rays->getVectorFirst(i);
+			last = rays->getVectorLast(i);
+			for (j = first; j < last && indices_r[j] < ws->m; ++j){
+				rhs_times_ray[i] -= elem_r[j] * rhs[indices_r[j]];
+			}
+			// the last value of j is where the rayA starts for the curr ray
+			if (j < last){
+				rayA_start[i] = j;	
+			} else {
+				// this should only happen when all rayA are zero
+				rayA_start[i] = last;
+			}
+		}
 
 		for (t = 0; t < ws->dual_func->num_terms; t++){
 
@@ -4754,25 +4776,20 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			is_term_feas = TRUE;
 
 			for (int r = 0; (r < ws->dual_func->num_rays) && (is_term_feas); r++){
-				ray_times_b = 0;
-
-				first = rays->getVectorFirst(r);
+				
+				farkasProof = rhs_times_ray[r];
 				last = rays->getVectorLast(r);
 
-				for (j = first; j < last && indices_r[j] < ws->m; ++j){
-					ray_times_b -= elem_r[j] * rhs[indices_r[j]];
-				}
-
-				for (int i = j; i < last; i++){
+				for (int i = rayA_start[r]; i < last; i++){
 					if (elem_r[i] > zerotol){
-						ray_times_b += elem_r[i] * lb[indices_r[i] - ws->m];
+						farkasProof += elem_r[i] * lb[indices_r[i] - ws->m];
 					} 
 					else if (elem_r[i] < -zerotol){
-						ray_times_b += elem_r[i] * ub[indices_r[i] - ws->m];
+						farkasProof += elem_r[i] * ub[indices_r[i] - ws->m];
 					}
 				}
 
-				if (ray_times_b > 1e-5){
+				if (farkasProof > 1e-5){
 					// This term of the disjunction is infeasible for this rhs
 					// and should not be considered
 					is_term_feas = FALSE;
@@ -4849,7 +4866,6 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 		ws->dual_func->lp_cpu_time += cpu_time_used;
 	}
-
 #endif
 	
 	start = clock();
@@ -4860,9 +4876,6 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 
 		disj = ws->dual_func->disj + t;
 		local_best_bound = -SYM_INFINITY;
-
-		// Sanity check on dual optimal value
-		disj = ws->dual_func->disj + t;
 
 		change_lbub_from_disj(lb, ub, ws->n, disj);
 
@@ -4925,7 +4938,8 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 #ifdef DEBUG_DUAL_FUNC
 		// Equality with sanity_objVal may not hold since
 		// CLP might have stopped the solution of LPs prematurely 
-		// due to the curr UB in the Tree but this is not a problem.
+		// due to the curr UB in the Tree but this is not a problem
+		// as long as the dual solution we have is enough to be "pruned by bound".
 		// Hence we check that local_best_bound 
 		// is a valid dual bound to sanity_objVal
 		assert((local_best_bound - sanity_objVal) < 0.001);
@@ -4962,9 +4976,11 @@ TERM_EVAL_DUAL_FUNC:
 	FREE(lb);
 	FREE(ub);
 	FREE(rhs);
-	if (feas_terms);	
-		FREE(feas_terms);
-
+	FREE(feas_terms);
+	if (ws->dual_func->num_rays > 0){	
+		FREE(rhs_times_ray);
+		FREE(rayA_start);
+	}
 
 	return (FUNCTION_TERMINATED_NORMALLY);
 #else
