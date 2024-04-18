@@ -4639,7 +4639,6 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	double factor = 0;
 	double global_best_bound = SYM_INFINITY;
 	double local_best_bound;
-	double *ray = NULL;
 	double *rhs_times_ray = NULL;
 	int *rayA_start = NULL;
 	double farkasProof = 0;
