@@ -4936,9 +4936,6 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			global_best_bound = local_best_bound;
 		}
 
-		// if (t <= 146)
-		// 	printf("t = %d, global_best_bound: %.5f\n", t, global_best_bound);
-
 		reset_lbub_from_disj(lb, ub, mip->lb, mip->ub, ws->n, disj);
 	}
 	

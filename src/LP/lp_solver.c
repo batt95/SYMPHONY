@@ -3852,15 +3852,18 @@ void get_dual_ray(LPdata *lp_data)
    // assert(raysReturned == 1);
 
    double *ray;
+   double *origRayCLP = (double *)malloc(DSIZE * lp_data->maxm);
    int i;
    bool is_ray_empty = TRUE, ray_is_ok = FALSE;
    double norm = 0;
    double ray_times_b = 0;
    double *rayA = NULL;
+   double *lambda = NULL;
    const CoinPackedMatrix *A;
 
    if (raysReturned && vRays[0]){
       ray = vRays[0];
+      memcpy(origRayCLP, vRays[0], DSIZE * lp_data->maxm);
       
       for (i = 0; i < lp_data->maxm; i++)
       {
@@ -3899,11 +3902,18 @@ void get_dual_ray(LPdata *lp_data)
          lp_data->has_ray = TRUE;
       } else {
          ray_is_ok = FALSE;
+#ifdef CHECK_FARKAS
+         printf("Warning: get_dual_ray():\n");
+         printf("Farkas Proof on ray from CLP doesn't work.\n");
+         lp_data->si->writeMps("farkas_proof_ray");
+         lp_data->si->writeLp("farkas_proof_ray");
+#endif
       }
    } 
    
    if (!ray_is_ok)
    {
+      delete[] vRays[0];
       ray = NULL;
       lp_data->has_ray = FALSE;
 
@@ -3970,6 +3980,9 @@ void get_dual_ray(LPdata *lp_data)
 
       solver.addCols(newcols, cols, clb, cub, obj);
       delete[] index;
+      for (int i = 0; i < newcols; i++){
+         delete cols[i];
+      }
       delete[] cols;
       delete[] clb;
       delete[] cub;
@@ -3980,7 +3993,7 @@ void get_dual_ray(LPdata *lp_data)
 
       const double *solverpi = solver.getRowPrice();
 
-      double *lambda = (double *)malloc(lp_data->maxm * DSIZE);
+      lambda = new double[lp_data->maxm];
       
       for (i = lp_data->maxm - 1; i >= 0; --i) {
          lambda[i] = -solverpi[i];
@@ -4010,7 +4023,7 @@ void get_dual_ray(LPdata *lp_data)
       // assert(i < lp_data->m);
       memcpy(lp_data->raysol, ray, (lp_data->maxm) * DSIZE);
 
-#ifdef CHECK_DUAL_FUNC
+#ifdef CHECK_FARKAS
       // Check Farkas proof applies to ray
       // ray * A
       ray_times_b = 0;
@@ -4042,13 +4055,9 @@ void get_dual_ray(LPdata *lp_data)
 #endif
       lp_data->has_ray = TRUE;
       
-      if (vRays[0]){
-         delete[] vRays[0];
-      } else {
-         FREE(ray);
-      }
-      ray = NULL;
+      delete[] ray;
       FREE(rayA);
+      FREE(origRayCLP);
    }
 }
 
