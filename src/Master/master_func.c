@@ -3830,6 +3830,9 @@ void print_dual_function(warm_start_desc *ws)
 {
 	int k = 0;
 	int tot_duals = 0;
+	int major, minor, num_elem, ord;
+	const double* elem;
+    const int* indices;
 
 	if (!ws || !ws->dual_func){
 		printf("WARNING: No dual function in the current warm start!\n");
@@ -3855,16 +3858,25 @@ void print_dual_function(warm_start_desc *ws)
 	// printf("==========================\n");
 	// printf("RAYS\n");
 	// printf("==========================\n");
+	// CoinPackedMatrix *rays = ws->dual_func->rays;
+	// elem = rays->getElements();
+    // indices = rays->getIndices();
+	// major = rays->getMajorDim();
+	// minor = rays->getMinorDim();
+	// num_elem = rays->getNumElements();
+	// ord = rays->isColOrdered();
 	// if (ws->dual_func->num_rays == 0){
 	// 	printf("No rays!");
 	// 	printf("\n------------------------\n");
 	// } else {
-	// 	for (int i = 0; i < ws->dual_func->num_rays; i++){
-	// 		for (int j = 0; j < ws->m + ws->n; j++){
-	// 			printf("%.10f ", ws->dual_func->rays[i][j]);
+	// 	for (int i = 0; i < major; i++){
+	// 		const CoinBigIndex last = rays->getVectorLast(i);
+	// 		for (CoinBigIndex j = rays->getVectorFirst(i); j < last; ++j){
+	// 			// printf("%d, %d - %d \n", j, last, indices[j]);
+	// 			printf("%d : %.10f, ", indices[j] < ws->m ? indices[j] : indices[j] /*- ws->m*/, elem[j]);
 	// 		}
 	// 		printf("\n------------------------\n");
-	// 	}
+   	// 	}
 	// }
 
 	// CoinPackedMatrix *duals = ws->dual_func->duals;
@@ -3872,14 +3884,12 @@ void print_dual_function(warm_start_desc *ws)
 	// printf("DUAL SOLUTIONS + REDUCED COSTS \n");
 	// printf("===============================\n");
 
-    // const double* elem = duals->getElements();
-    // const int* indices = duals->getIndices();
-
-	// int major = duals->getMajorDim();
-	// int minor = duals->getMinorDim();
-	// int num_elem = duals->getNumElements();
-	// int peppe = duals->getVectorLast(0);
-	// int ord = duals->isColOrdered();
+	// elem = duals->getElements();
+    // indices = duals->getIndices();
+	// major = duals->getMajorDim();
+	// minor = duals->getMinorDim();
+	// num_elem = duals->getNumElements();
+	// ord = duals->isColOrdered();
 	// if (major == 0){
 	// 	printf("No Dual Solutions!");
 	// 	printf("\n------------------------\n");
@@ -3887,7 +3897,6 @@ void print_dual_function(warm_start_desc *ws)
 	// 	for (int i = 0; i < major; i++){
 	// 		const CoinBigIndex last = duals->getVectorLast(i);
 	// 		for (CoinBigIndex j = duals->getVectorFirst(i); j < last; ++j){
-	// 			// printf("%d, %d - %d \n", j, last, indices[j]);
 	// 			printf("%d : %.10f, ", indices[j] < ws->m ? indices[j] : indices[j] /*- ws->m*/, elem[j]);
 	// 		}
 	// 		printf("\n------------------------\n");
@@ -3900,56 +3909,10 @@ void print_dual_function(warm_start_desc *ws)
 	// printf("==========================\n");
 	// if (ws->dual_func->num_terms == 0){
 	// 	printf("Only root node in the B&B Tree!\n");
-	// 	printf("Feasibility Status: ");
-	// 		switch (ws->rootnode->feasibility_status)
-	// 		{
-	// 		case ROOT_NODE:
-	// 			printf("ROOT_NODE\n");
-	// 			break;
-			
-	// 		case INFEASIBLE_PRUNED:
-	// 			printf("INFEASIBLE_PRUNED\n");
-	// 			break;
-			
-	// 		case FEASIBLE_PRUNED:
-	// 			printf("FEASIBLE_PRUNED\n");
-	// 			break;
-
-	// 		case OVER_UB_PRUNED:
-	// 			printf("OVER_UB_PRUNED\n");
-	// 			break;
-			
-	// 		default:
-	// 			printf("UNKNOWN\n");
-	// 			break;
-	// 		}
 	// } else {
 	// 	for (int i = 0; i < ws->dual_func->num_terms; i++)
 	// 	{
-	// 		printf("Feasibility Status: ");
-	// 		switch (ws->dual_func->feas_stati[i])
-	// 		{
-	// 		case ROOT_NODE:
-	// 			printf("ROOT_NODE\n");
-	// 			break;
-			
-	// 		case INFEASIBLE_PRUNED:
-	// 			printf("INFEASIBLE_PRUNED\n");
-	// 			break;
-			
-	// 		case FEASIBLE_PRUNED:
-	// 			printf("FEASIBLE_PRUNED\n");
-	// 			break;
-
-	// 		case OVER_UB_PRUNED:
-	// 			printf("OVER_UB_PRUNED\n");
-	// 			break;
-			
-	// 		default:
-	// 			printf("UNKNOWN\n");
-	// 			break;
-	// 		}
-	// 		// printDisjunction(ws->dual_func->disj[i]);
+	// 		printDisjunction(ws->dual_func->disj[i]);
 	// 	}
 	// }
 	
