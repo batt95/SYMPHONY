@@ -189,7 +189,7 @@ int main(int argc, char **argv)
       // Set the new RHS
       set_rhs(env_warm, rhs, m);
 
-      sym_write_lp(env_warm, "peppe.lp");
+      // sym_write_lp(env_warm, "peppe.lp");
 
       // Cold solve
       if ((termcode = sym_warm_solve(env_warm)) < 0){

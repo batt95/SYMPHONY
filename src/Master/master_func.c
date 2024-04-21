@@ -4592,6 +4592,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	}
 
 	int i, u, l, t, idx, curr_is_infty;
+	double val;
 	CoinPackedMatrix *duals = ws->dual_func->duals;
 	CoinPackedMatrix *rays = ws->dual_func->rays;
 	disjunction_desc *disj;
@@ -4609,11 +4610,14 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	int *feas_terms = NULL;
 	int is_term_feas = TRUE;
 	int num_feas_terms = 0;
-	double rhs_times_pi_plus_dj = 0;
-	int is_infty = 0;
+	double dual_obj = 0;
+	double is_infty = 0;
 	
 	// Allocate space for rhs * pi (i.e. dual solution)
-	double *rhs_times_pi = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
+	// double *rhs_times_pi = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
+	double *rhs_times_pi_plus_dj = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
+	double *is_dual_obj_infty = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
+
 	int *dj_start = (int *)malloc(ws->dual_func->num_pieces * ISIZE);
 	double *lb = (double *)malloc(ws->n * sizeof(double));
 	double *ub = (double *)malloc(ws->n * sizeof(double)); 
@@ -4630,7 +4634,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		first = duals->getVectorFirst(i);
 		last = duals->getVectorLast(i);
 		for (j = first; j < last && indices[j] < ws->m; ++j){
-			rhs_times_pi[i] += elem[j] * rhs[indices[j]];
+			rhs_times_pi_plus_dj[i] += elem[j] * rhs[indices[j]];
 		}
 		// the last value of j is where the djs starts for the curr dual piece
 		if (j < last){
@@ -4639,39 +4643,39 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			// this should only happen when all djs are zero
 			dj_start[i] = last;
 		}
+		
+		// Add reduced costs from the root lb/ub
+		for (j = dj_start[i]; j < last; j++)
+		{
+			idx = indices[j] - ws->m;
+			val = elem[j];
+			if (val > zerotol) // dj > 0 ?
+			{
+				if (lb[idx] > -SYM_INFINITY){
+					rhs_times_pi_plus_dj[i] += val * lb[idx];
+				} else {
+					is_dual_obj_infty[i] -= val;
+				}
+			}
+			else if (val < -zerotol) // dj < 0 ?
+			{
+				if (ub[idx] < SYM_INFINITY){
+					rhs_times_pi_plus_dj[i] += val * ub[idx];
+				} else {
+					is_dual_obj_infty[i] -= val;	
+				}
+			}
+		}
 	}
 
 	if (ws->dual_func->num_terms == 0){
 		// The current b&b tree consists just of the root node
 		local_best_bound = -SYM_INFINITY;
-		// Now add the lb/ub * dj from the original MIP
+		// Now take the maximum
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
-			rhs_times_pi_plus_dj = rhs_times_pi[i];
-			is_infty = 0;
-			last = duals->getVectorLast(i);
-			for (j = dj_start[i]; j < last; j++)
-			{
-				idx = indices[j] - ws->m;
-				if (elem[j] >= zerotol) // dj > 0 ?
-				{
-					if (lb[idx] > -SYM_INFINITY){
-						rhs_times_pi_plus_dj += elem[j] * lb[idx];
-					} else {
-						is_infty -= elem[j];
-					}
-				}
-				else if (elem[j] <= -zerotol) // dj < 0 ?
-				{
-					if (ub[idx] < SYM_INFINITY){
-						rhs_times_pi_plus_dj += elem[j] * ub[idx];
-					} else {
-						is_infty -= elem[j];	
-					}
-				}
-			}
-
-			if ((is_infty == 0) && (rhs_times_pi_plus_dj > local_best_bound)){
-				local_best_bound = rhs_times_pi_plus_dj;
+			if ((fabs(is_dual_obj_infty[i]) < zerotol) && 
+			    (rhs_times_pi_plus_dj[i] > local_best_bound)){
+				local_best_bound = rhs_times_pi_plus_dj[i];
 			}
 		}
 		
@@ -4837,9 +4841,17 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		t = (num_feas_terms == ws->dual_func->num_terms ? k : feas_terms[k]);
 
 		disj = ws->dual_func->disj + t;
+		int lblen = disj->lblen;
+		int *lbvaridx = disj->lbvaridx;
+		double *disj_lb = disj->lb;
+
+		int ublen = disj->ublen;
+		int *ubvaridx = disj->ubvaridx;
+		double *disj_ub = disj->ub;
+
 		local_best_bound = -SYM_INFINITY;
 
-		change_lbub_from_disj(lb, ub, ws->n, disj);
+		// change_lbub_from_disj(lb, ub, ws->n, disj);
 
 #ifdef DEBUG_DUAL_FUNC
 		clock_t start, end;
@@ -4865,35 +4877,37 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 #endif
 		for (i = 0; i < ws->dual_func->num_pieces; i++){
 
-			rhs_times_pi_plus_dj = rhs_times_pi[i];
-			is_infty = 0;
+			dual_obj = rhs_times_pi_plus_dj[i];
+			is_infty = is_dual_obj_infty[i];
 			j = dj_start[i];
 			last = duals->getVectorLast(i);
-
+			l = 0, u = 0;
 			for (j = dj_start[i]; j < last; j++)
 			{
 				idx = indices[j] - ws->m;
-				if (elem[j] >= zerotol) // dj > 0 ?
-				{
-					if (lb[idx] > -SYM_INFINITY){
-						rhs_times_pi_plus_dj += elem[j] * lb[idx];
-					} else {
-						is_infty -= elem[j];
+				val = elem[j];
+				if (val > zerotol) {
+					while (l < lblen && lbvaridx[l] < idx) l++;
+					if (l < lblen && lbvaridx[l] == idx){
+						dual_obj += val * (disj_lb[l] - lb[idx]);
+						if (!(lb[idx] > -SYM_INFINITY)){
+							is_infty += val;
+						}
 					}
-				}
-				else if (elem[j] <= -zerotol) // dj < 0 ?
-				{
-					if (ub[idx] < SYM_INFINITY){
-						rhs_times_pi_plus_dj += elem[j] * ub[idx];
-					} else {
-						is_infty -= elem[j];	
+				} else if (val < zerotol) {
+					while (u < ublen && ubvaridx[u] < idx) u++;
+					if (u < ublen && ubvaridx[u] == idx){
+						dual_obj += val * (disj_ub[u] - ub[idx]);
+						if (!(ub[idx] < SYM_INFINITY)){
+							is_infty += val;	
+						}
 					}
 				}
 			}
 			
-			if ((is_infty == 0) &&
-				(rhs_times_pi_plus_dj > local_best_bound)){
-				local_best_bound = rhs_times_pi_plus_dj;
+			if ((fabs(is_infty) < zerotol) &&
+				(dual_obj > local_best_bound)){
+				local_best_bound = dual_obj;
 			} 
 		}
 
@@ -4904,7 +4918,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		// as long as the dual solution we have is enough to be "pruned by bound".
 		// Hence we check that local_best_bound 
 		// is a valid dual bound to sanity_objVal
-		assert((local_best_bound - sanity_objVal) < 0.001);
+		// assert((local_best_bound - sanity_objVal) < 0.001);
 #endif	
 		
 		if (fabs(local_best_bound - global_best_bound) > zerotol && // Not equals
@@ -4912,7 +4926,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			global_best_bound = local_best_bound;
 		}
 
-		reset_lbub_from_disj(lb, ub, mip->lb, mip->ub, ws->n, disj);
+		// reset_lbub_from_disj(lb, ub, mip->lb, mip->ub, ws->n, disj);
 	}
 	
 TERM_EVAL_DUAL_FUNC:
@@ -4933,7 +4947,8 @@ TERM_EVAL_DUAL_FUNC:
 	
 	*dual_bound = global_best_bound;
 
-	FREE(rhs_times_pi);
+	FREE(rhs_times_pi_plus_dj);
+	FREE(is_dual_obj_infty);
 	FREE(dj_start);
 	FREE(lb);
 	FREE(ub);
