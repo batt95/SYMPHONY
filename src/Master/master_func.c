@@ -4629,6 +4629,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	const double* elem = duals->getElements();
     const int* indices = duals->getIndices();
 
+	start = clock();
 	// Start by computing rhs * pi 
 	for (i = 0; i < ws->dual_func->num_pieces; i++){
 		first = duals->getVectorFirst(i);
@@ -4667,6 +4668,10 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			}
 		}
 	}
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	ws->dual_func->duals_cpu_time += cpu_time_used;
+	printf("%.10f\n", ws->dual_func->duals_cpu_time);
 
 	if (ws->dual_func->num_terms == 0){
 		// The current b&b tree consists just of the root node
@@ -4889,16 +4894,22 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 				if (val > zerotol) {
 					while (l < lblen && lbvaridx[l] < idx) l++;
 					if (l < lblen && lbvaridx[l] == idx){
-						dual_obj += val * (disj_lb[l] - lb[idx]);
-						if (!(lb[idx] > -SYM_INFINITY)){
+					// 	dual_obj += val * (disj_lb[l] - lb[idx]);
+						if (lb[idx] > -SYM_INFINITY) {
+							dual_obj += val * (disj_lb[l] - lb[idx]);
+						} else {
+							dual_obj += val * disj_lb[l];
 							is_infty += val;
 						}
 					}
 				} else if (val < zerotol) {
 					while (u < ublen && ubvaridx[u] < idx) u++;
 					if (u < ublen && ubvaridx[u] == idx){
-						dual_obj += val * (disj_ub[u] - ub[idx]);
-						if (!(ub[idx] < SYM_INFINITY)){
+						// dual_obj += val * (disj_ub[u] - ub[idx]);
+						if (ub[idx] < SYM_INFINITY){
+							dual_obj += val * (disj_ub[u] - ub[idx]);
+						} else {
+							dual_obj += val * (disj_ub[u]);
 							is_infty += val;	
 						}
 					}
