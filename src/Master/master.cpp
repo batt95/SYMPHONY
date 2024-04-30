@@ -6860,6 +6860,14 @@ SYMPHONYLIB_EXPORT double sym_get_lp_time_dual_func(sym_environment *env) {
    }
 }
 
+SYMPHONYLIB_EXPORT int sym_get_tree_size(sym_environment *env) {
+   if (env->warm_start){
+      return env->warm_start->stat.tree_size;
+   } else {
+      return 0;
+   }
+}
+
 /*===========================================================================*/
 /*===========================================================================*/
 

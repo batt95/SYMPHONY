@@ -3963,6 +3963,8 @@ int is_ray_new(ray_hash **hashtb, ray_hash *toAdd){
 
 #ifdef CHECK_DUAL_FUNC
 	int count_leaf = 0;
+	int count_over_ub = 0;
+	int count_optimal = 0;
 #endif
 
 void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip, 
@@ -4053,6 +4055,12 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 			if ((dual && is_dual_new(&(ws->dual_func->dhashtb), dual))){
 				// successfully added, collect reduced costs
 				// find nnzs and fill reduced costs related structures
+#ifdef CHECK_DUAL_FUNC
+				if (node->feasibility_status == OVER_UB_PRUNED) count_over_ub++;
+				if (node->feasibility_status == FEASIBLE_PRUNED ||
+				    node->feasibility_status == ROOT_NODE ||
+					node->feasibility_status == NODE_BRANCHED_ON) count_optimal++;
+#endif
 				for (i = 0; i < ws->m; i++)
 				{
 					if (fabs(node->duals[i]) >= zerotol)
@@ -4520,7 +4528,10 @@ int build_dual_func(sym_environment *env)
 		}	
 #endif
 	}
-
+#ifdef CHECK_DUAL_FUNC
+	printf("Num unique optimal Dual solutions: %d\n", count_optimal);
+	printf("Num unique non optimal Dual solutions: %d\n", count_over_ub);
+#endif
 	FREE(bpath);
 	FREE(duals_index_row);
 	FREE(duals_index_col);
@@ -4612,7 +4623,10 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	int num_feas_terms = 0;
 	double dual_obj = 0;
 	double is_infty = 0;
-	
+#ifdef CHECK_DUAL_FUNC
+	int idx_loc_dual = -1;
+	int idx_opt_dual = -1;
+#endif
 	// Allocate space for rhs * pi (i.e. dual solution)
 	// double *rhs_times_pi = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
 	double *rhs_times_pi_plus_dj = (double *)calloc(ws->dual_func->num_pieces, DSIZE);
@@ -4671,7 +4685,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	ws->dual_func->duals_cpu_time += cpu_time_used;
-	printf("%.10f\n", ws->dual_func->duals_cpu_time);
+	// printf("%.10f\n", ws->dual_func->duals_cpu_time);
 
 	if (ws->dual_func->num_terms == 0){
 		// The current b&b tree consists just of the root node
@@ -4918,6 +4932,9 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 			
 			if ((fabs(is_infty) < zerotol) &&
 				(dual_obj > local_best_bound)){
+#ifdef CHECK_DUAL_FUNC
+				idx_loc_dual = i;
+#endif
 				local_best_bound = dual_obj;
 			} 
 		}
@@ -4931,9 +4948,15 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		// is a valid dual bound to sanity_objVal
 		// assert((local_best_bound - sanity_objVal) < 0.001);
 #endif	
-		
+
+#ifdef CHECK_DUAL_FUNC
+		printf("Idx dual solution yielding optimal value at this term: %d\n", idx_loc_dual);
+#endif
 		if (fabs(local_best_bound - global_best_bound) > zerotol && // Not equals
 		    local_best_bound < global_best_bound){ 
+#ifdef CHECK_DUAL_FUNC
+			idx_opt_dual = idx_loc_dual;
+#endif
 			global_best_bound = local_best_bound;
 		}
 
@@ -4955,7 +4978,9 @@ TERM_EVAL_DUAL_FUNC:
 
 	// Assuming minimization here ???
 	global_best_bound = ceil((global_best_bound - zerotol) / factor) * factor;
-	
+#ifdef CHECK_DUAL_FUNC
+	printf("Idx dual solution yielding optimal value: %d\n", idx_opt_dual);
+#endif	
 	*dual_bound = global_best_bound;
 
 	FREE(rhs_times_pi_plus_dj);
