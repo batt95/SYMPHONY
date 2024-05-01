@@ -3972,7 +3972,7 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 				  int* curr_ray, int *rays_index_row, int *rays_index_col, double *rays_val,
 				  int* curr_piece, int *duals_index_row, int *duals_index_col, double *duals_val,
 				  int *nnz_duals, int *nnz_rays){
-
+	
 	if (node == NULL)
 	{
 		printf("Warning: NULL pointer in get_leaf_node_data()\n");
@@ -4100,8 +4100,8 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 	{
 		// printf(" - %d Fesibility status of this leaf: %d\n", count_leaf, node->feasibility_status);
 		// printf("   %d Lower bound at this leaf: %.5f\n", count_leaf, node->lower_bound);
-		if (level > 0)
-		{
+		// if (level > 0)
+		// {
 			disj.lb = NULL;
 			disj.lbvaridx = NULL;
 			disj.ub = NULL;
@@ -4173,7 +4173,7 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 			ws->dual_func->disj[*curr_term] = disj;
 
 			(*curr_term)++;
-		}
+		// }
 		// Must collect the ray
 		if ((node->feasibility_status == INFEASIBLE_PRUNED) ||
 			((node->feasibility_status == OVER_UB_PRUNED) && (node->rays))){
@@ -4687,20 +4687,20 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 	ws->dual_func->duals_cpu_time += cpu_time_used;
 	// printf("%.10f\n", ws->dual_func->duals_cpu_time);
 
-	if (ws->dual_func->num_terms == 0){
-		// The current b&b tree consists just of the root node
-		local_best_bound = -SYM_INFINITY;
-		// Now take the maximum
-		for (i = 0; i < ws->dual_func->num_pieces; i++){
-			if ((fabs(is_dual_obj_infty[i]) < zerotol) && 
-			    (rhs_times_pi_plus_dj[i] > local_best_bound)){
-				local_best_bound = rhs_times_pi_plus_dj[i];
-			}
-		}
+	// if (ws->dual_func->num_terms == 0){
+	// 	// The current b&b tree consists just of the root node
+	// 	local_best_bound = -SYM_INFINITY;
+	// 	// Now take the maximum
+	// 	for (i = 0; i < ws->dual_func->num_pieces; i++){
+	// 		if ((fabs(is_dual_obj_infty[i]) < zerotol) && 
+	// 		    (rhs_times_pi_plus_dj[i] > local_best_bound)){
+	// 			local_best_bound = rhs_times_pi_plus_dj[i];
+	// 		}
+	// 	}
 		
-		global_best_bound = local_best_bound;
-		goto TERM_EVAL_DUAL_FUNC;
-	}
+	// 	global_best_bound = local_best_bound;
+	// 	goto TERM_EVAL_DUAL_FUNC;
+	// }
 
 	/* =========== feb223 ============================================
 	// Use the dual rays in the Dual Function description to check
