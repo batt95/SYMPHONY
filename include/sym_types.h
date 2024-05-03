@@ -919,7 +919,8 @@ typedef struct MIPDESC{
 
 // uthash.h hashtable is used to keep unique dual solutions
 typedef struct DUAL_HASH {
-    int           *basis_idx; // idx of basic vars and slacks
+   //  int           *basis_idx; // idx of basic vars and slacks
+    int           *dual;
     int            len;       // length of basis_idx
     UT_hash_handle hh;        // hashmap handler
 } dual_hash;

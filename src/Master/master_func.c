@@ -3686,7 +3686,8 @@ void free_master(sym_environment *env)
 			dual_hash *tmp1, *curr1;
 			HASH_ITER(hh, env->warm_start->dual_func->dhashtb, curr1, tmp1) {
 				HASH_DEL(env->warm_start->dual_func->dhashtb, curr1);  
-				FREE(curr1->basis_idx);
+				// FREE(curr1->basis_idx);
+				FREE(curr1->dual);
 				FREE(curr1);             
 			}
 			FREE(env->warm_start->dual_func->dhashtb);
@@ -3934,10 +3935,12 @@ int is_dual_new(dual_hash **hashtb, dual_hash *toAdd){
     dual_hash *s;
 	int is_added = 0;
 	int len = sizeof(int) * toAdd->len;
-    HASH_FIND(hh, *hashtb, toAdd->basis_idx, len, s);
+    // HASH_FIND(hh, *hashtb, toAdd->basis_idx, len, s);
+	HASH_FIND(hh, *hashtb, toAdd->dual, len, s);
     if (s == NULL){
         s = toAdd;
-        HASH_ADD_KEYPTR(hh, *hashtb, s->basis_idx, len, s);
+        // HASH_ADD_KEYPTR(hh, *hashtb, s->basis_idx, len, s);
+		HASH_ADD_KEYPTR(hh, *hashtb, s->dual, len, s);
 		is_added = 1;
     } else {
         is_added = 0;
@@ -4039,17 +4042,24 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 		 (ws->dual_func->policy == DUALS_LEAF_ONLY && !child_num)))
 		{
 			dual = NULL;
-			if (node->basis_idx && (node->basis_len > 0)){
+			// if (node->basis_idx && (node->basis_len > 0)){
 				dual = (dual_hash *)malloc(sizeof(dual_hash));
-				dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
-				memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
-				dual->len = node->basis_len;
+				// dual->basis_idx = (int *)malloc(ISIZE * node->basis_len);
+				dual->dual = (int *)calloc(ws->m, ISIZE);
+				// memcpy(dual->basis_idx, node->basis_idx, ISIZE * node->basis_len);
+				for (int i = 0; i < ws->m; i++){
+					if (fabs(node->duals[i]) > 1e-6){
+						dual->dual[i] = node->duals[i] * 1e6;
+					}
+				}
+				// dual->len = node->basis_len;
+				dual->len = ws->m;
 				// COMMENT THIS when using the hash table
 				// if (dual){
 				// 	FREE(dual->basis_idx);
 				// 	FREE(dual);
 				// }
-			} 
+			// } 
 			// try to add this dual into the hashtable
 			// TODO: are the basis_idx correctly set??? Are they unique???
 			if ((dual && is_dual_new(&(ws->dual_func->dhashtb), dual))){
@@ -4087,7 +4097,8 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 			} else {
 				// This dual is a duplicate, we can FREE it
 				if (dual){
-					FREE(dual->basis_idx);
+					// FREE(dual->basis_idx);
+					FREE(dual->dual);
 					FREE(dual);
 				}
 				
@@ -4854,6 +4865,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 #endif
 	
 	start = clock();
+// #pragma omp parallel for shared(global_best_bound)
 	// Now adjust the lb/ub * dj from the disjunction terms
 	for (int k = 0; k < num_feas_terms; k++){
 
@@ -4894,7 +4906,7 @@ int evaluate_dual_function(warm_start_desc *ws, MIPdesc *mip,
 		cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 		ws->dual_func->lp_cpu_time += cpu_time_used;
 #endif
-		for (i = 0; i < ws->dual_func->num_pieces; i++){
+		for (int i = 0; i < ws->dual_func->num_pieces; i++){
 
 			dual_obj = rhs_times_pi_plus_dj[i];
 			is_infty = is_dual_obj_infty[i];
