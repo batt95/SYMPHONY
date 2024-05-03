@@ -1080,7 +1080,7 @@ void send_node_desc(lp_prob *p, int node_type)
 	 if (lp_data->has_ray){
 	    int have_ray = TRUE;
 	    send_int_array(&have_ray, 1);
-	    send_dbl_array(lp_data->raysol, lp_data->maxm);
+	    send_dbl_array(lp_data->raysol, lp_data->m);
 	 }else{
 	    int have_ray = FALSE;
 	    send_int_array(&have_ray, 1);

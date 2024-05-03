@@ -377,7 +377,7 @@ int fathom_branch(lp_prob *p)
          {
             p->dualsol = (double *)malloc(lp_data->maxm * DSIZE);
          }
-         memcpy(p->dualsol, lp_data->dualsol, lp_data->maxm * DSIZE);
+         memcpy(p->dualsol, lp_data->dualsol, lp_data->m * DSIZE);
       }
       if (p->par.sensitivity_bounds)
       {
@@ -386,7 +386,7 @@ int fathom_branch(lp_prob *p)
                p->raysol = (double *)malloc((lp_data->maxm) * DSIZE);
             }
             if (lp_data->has_ray){
-               memcpy(p->raysol, lp_data->raysol, (lp_data->maxm) * DSIZE);
+               memcpy(p->raysol, lp_data->raysol, (lp_data->m) * DSIZE);
             }
          }
          // feb223
