@@ -4515,7 +4515,7 @@ int build_dual_func(sym_environment *env)
 	// Update the number of disjunction terms
 	// Delete the previous disjunction, there will be a new one
 	if (ws->dual_func->disj){
-		free_disjunction(ws->dual_func->disj);
+		free_disjunction(ws->dual_func);
 	}
 	ws->dual_func->disj = disj;
 	ws->dual_func->num_terms = curr_term;
