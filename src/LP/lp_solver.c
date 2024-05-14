@@ -26,6 +26,7 @@
 
 // #define CHECK_DUAL_SOLUTION
 // #define CHECK_DUAL_FUNC
+// #define CHECK_FARKAS
 
 #ifdef PRINT
 #undef PRINT

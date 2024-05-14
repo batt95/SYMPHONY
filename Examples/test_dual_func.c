@@ -10,8 +10,8 @@
 // These paths should be changed
 // I still don't figure out how to use makefile to 
 // include these files automatically
-#include "../include/sym_types.h"
-#include "../include/sym_master.h"
+#include "/Users/feb223/projects/coin/RVF/SYMPHONY/include/sym_types.h"
+#include "/Users/feb223/projects/coin/RVF/SYMPHONY/include/sym_master.h"
 
 void generate_rand_array(int m, int l, int u, double *res) {
   for (int i = 0; i < m; i++) {
@@ -38,6 +38,40 @@ void set_rhs(sym_environment *env, double *rhs, int m){
    }
 }
 
+int change_lbub_from_disj(double *lb, double *ub, int n, disjunction_desc* disj){
+	int i, idx;
+	// Fill the lb
+	for (i = 0; i < disj->lblen; i++){
+		idx = disj->lbvaridx[i];
+		lb[idx] = disj->lb[i];
+	}
+	// Fill the ub
+	for (i = 0; i < disj->ublen; i++){
+		idx = disj->ubvaridx[i];
+		ub[idx] = disj->ub[i];
+	}
+
+	return 0;
+}
+
+int reset_lbub_from_disj(double *lb, double *ub, 
+						double *orig_lb, double *orig_ub, int n, 
+						disjunction_desc* disj){
+	int i, idx;
+	// Revert the lb
+	for (i = 0; i < disj->lblen; i++){
+		idx = disj->lbvaridx[i];
+		lb[idx] = orig_lb[idx];
+	}
+	// Revert the ub
+	for (i = 0; i < disj->ublen; i++){
+		idx = disj->ubvaridx[i];
+		ub[idx] = orig_ub[idx];
+	}
+	
+	return 0;
+}
+
 int main(int argc, char **argv)
 {   
    
@@ -50,16 +84,18 @@ int main(int argc, char **argv)
    sym_environment *env_warm = sym_open_environment(); 
 
    sym_parse_command_line(env_warm, argc, argv); 
-   sym_parse_command_line(env_cold, argc, argv); 
+   // sym_parse_command_line(env_cold, argc, argv); 
 
    sym_load_problem(env_warm);
-   sym_load_problem(env_cold);
+   // sym_load_problem(env_cold);
+   sym_read_lp(env_cold, "dummy.lp");
 
-   int m = env_cold->mip->m;
+   int m = env_warm->mip->m;
+   int n = env_warm->mip->n;
    double *rhs = (double*)malloc(sizeof(double) * m);
 
    sym_set_int_param(env_warm, "verbosity", -2);
-   sym_set_int_param(env_cold, "verbosity", -2);
+   // sym_set_int_param(env_cold, "verbosity", -2);
 
    // feb223
    // Those are the parameters to be set in order to 
@@ -80,145 +116,329 @@ int main(int argc, char **argv)
    sym_set_int_param(env_warm, "max_sp_size", 100);
    sym_set_int_param(env_warm, "do_reduced_cost_fixing", FALSE);
    sym_set_int_param(env_warm, "generate_cgl_cuts", FALSE);
-   sym_set_int_param(env_warm, "max_active_nodes", 1);
+   // sym_set_int_param(env_warm, "max_active_nodes", 1);
 
    // First solve 
    if ((termcode = sym_solve(env_warm)) < 0){
       printf("WARM: PROBLEM INFEASIBLE!\n");
    }
-   // print_tree(env_warm->warm_start->rootnode);
-   sym_build_dual_func(env_warm);
 
-   // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
-   
+   sym_build_dual_func(env_warm);
+   print_dual_function(env_warm);
+
+   // rhs[0] = 3000;
+   // rhs[1] = 3000;
+
+   // set_rhs(env_warm, rhs, m);
+   // sym_warm_solve(env_warm);
+
+   // sym_build_dual_func(env_warm);
+   // print_dual_function(env_warm);
+
+   // rhs[0] = 2000;
+   // rhs[1] = 2000;
+   // sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
+
    sym_get_obj_val(env_warm, &warmObjVal);
    printf("WARM OBJ : %.5f\n", warmObjVal);
 
-   double *rhss = (double *)malloc(sizeof(double) * numTrain * m);
-   int count = 0;
-
-   rhss[0] = 1500.00;
-   rhss[1] = 1500.00;
-
-   sym_evaluate_dual_function(env_warm, rhss, m, &dualFuncObj);
-   printf("DUAL FUNC OBJ : %.5f\n", dualFuncObj);
-   assert(fabs(warmObjVal -dualFuncObj) < 1e-5);
-   // assert(warmObjVal == dualFuncObj);
-
-   // free(rhss);
-   // free(rhs);
-   // sym_close_environment(env_warm);
-   // sym_close_environment(env_cold);
-
    // return 0;
 
+   double *lb = (double*)malloc(sizeof(double) * n);
+   double *ub = (double*)malloc(sizeof(double) * n);
 
-   // Build a dual function from a bunch of RHSs
-   for (int i = 0; i < numTrain; i++){
-      printf("=================================\n");
-      
-      printf("RHS %d\n", i);
+   memcpy(lb, env_warm->mip->lb, sizeof(double) * n);
+   memcpy(ub, env_warm->mip->ub, sizeof(double) * n);
 
-      // Generate a random new rhs
-      generate_rand_array(m, 500, 2000, rhs);
+   dual_func_desc *df = env_warm->warm_start->dual_func;
 
-      printf("RHS %d\n", i);
-      printf("RHS: (%.2f, %.2f)\n", rhs[0], rhs[1]);
+   const double* elem = df->duals->getElements();
+   const int* indices = df->duals->getIndices();
+   const double* elem_r = df->rays->getElements();
+   const int* indices_r = df->rays->getIndices();
+   int first, last, j;
 
-      rhss[count++] = rhs[0];
-      rhss[count++] = rhs[1];
-      
-      // Set the new RHS
-      set_rhs(env_warm, rhs, m);
+   double bigM = 10000000, epsilon = 1e-4;
+   // row data
+   int *col_indices = (int*)malloc(sizeof(int) * 10000);
+   double *col_elems = (double*)malloc(sizeof(double) * 10000);
+   int numelems = 0;
+   double intercept = 0;
 
-      if ((termcode = sym_warm_solve(env_warm)) < 0){
-         printf("PROBLEM INFEASIBLE!\n");
-      }
+   // col data
+   int *q_indices = (int*)malloc(sizeof(int) * 10000);
+   int q_len = 0;
+   int *u_indices = (int*)malloc(sizeof(int) * 10000);
+   int u_len = 0;
+   int *v_indices = (int*)malloc(sizeof(int) * 10000);
+   int v_len = 0;
+   int col_idx = 1;
+   char varname[33];
 
-      sym_build_dual_func(env_warm);
-
-      sym_get_obj_val(env_warm, &warmObjVal);
-      printf("WARM OBJ : %.5f\n", warmObjVal);
-
-      sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-      printf("DUAL FUNC OBJ : %.5f\n", dualFuncObj);
-      assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
-      // check_dual_solutions(env_cold->mip, env_warm->warm_start->dual_func);
+   // Add beta variables
+   for (int i = 0; i < m; i++){
+      snprintf(varname, sizeof(varname), "b%d", i);
+      sym_add_col(env_cold, 0, NULL, NULL, -bigM, bigM, 0, FALSE, varname);
+      col_idx++;
    }
 
-   count = 0;
-
-   // Assert the dual function remain strong for previous RHSs
-   for (int i = 0; i < numTrain; i++){
-      printf("=================================\n");
-      
-      printf("RHS %d\n", i);
-      printf("RHS: (%.2f, %.2f)\n", (rhss + count)[0], (rhss + count)[1]);
-      // Set the new RHS
-      set_rhs(env_warm, rhss + count, m);
-
-      if ((termcode = sym_warm_solve(env_warm)) < 0){
-         printf("PROBLEM INFEASIBLE!\n");
-      }
-
-      sym_get_obj_val(env_warm, &warmObjVal);
-      printf("WARM OBJ : %.5f\n", warmObjVal);
-
-      sym_evaluate_dual_function(env_warm, rhss + count, m, &dualFuncObj);
-      printf("DUAL FUNC OBJ : %.5f\n", dualFuncObj);
-      // assert(warmObjVal >= dualFuncObj);
-      assert(fabs(dualFuncObj - warmObjVal) < 1e-5);
-
-      count += m;
-
-   }
-
+   // Add phi variable
+   snprintf(varname, sizeof(varname), "p");
+   sym_add_col(env_cold, 0, NULL, NULL, -bigM, bigM, 1, FALSE, varname);
+   col_idx++;
    
+   for (int i = 0; i < df->num_terms; i++){
 
-   // -----------------------------------------------------
-   // RHS Test 
-   // -----------------------------------------------------
-   for(int i = 0; i < numTests; i++){
-      printf("=================================\n");
-      
-      printf("RHS %d\n", i);
+      // Add q_t variables
+      snprintf(varname, sizeof(varname), "q%d", i);
+      sym_add_col(env_cold, 0, NULL, NULL, -bigM, bigM, 0, FALSE, varname);
+      q_indices[q_len++] = col_idx++;
+      // Add u_t variables
+      snprintf(varname, sizeof(varname), "u%d", i);
+      sym_add_col(env_cold, 0, NULL, NULL, 0, 1, 0, TRUE, varname);
+      u_indices[u_len++] = col_idx++;
 
-      // Generate a random new rhs
-      generate_rand_array(m, 0, 6000, rhs);
-      
-      // Set the new RHS
-      set_rhs(env_warm, rhs, m);
+      if (df->disj[i].dual_idx >= 0){
+         // Add first constraint
+         // phi
+         col_indices[numelems] = m + 1;
+         col_elems[numelems++] = 1;
+         // q_t
+         col_indices[numelems] = q_indices[q_len - 1];
+         col_elems[numelems++] = -1;
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 'L', 0, 0);
+         
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
 
-      // sym_write_lp(env_warm, "peppe.lp");
+         // Add second constraint
+         // phi
+         col_indices[numelems] = m + 1;
+         col_elems[numelems++] = 1;
+         // q_t
+         col_indices[numelems] = q_indices[q_len - 1];
+         col_elems[numelems++] = -1;
+         // u_t
+         col_indices[numelems] = u_indices[u_len - 1];
+         col_elems[numelems++] = -bigM;
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 'G', -bigM, 0);
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
 
-      // Cold solve
-      if ((termcode = sym_warm_solve(env_warm)) < 0){
-         printf("PROBLEM INFEASIBLE!\n");
+         // Add third constraint
+         // q_t
+         col_indices[numelems] = q_indices[q_len - 1];
+         col_elems[numelems++] = 1;
+
+         first = df->duals->getVectorFirst(df->disj[i].dual_idx);
+		   last = df->duals->getVectorLast(df->disj[i].dual_idx);
+
+         for (j = first; j < last && indices[j] < m; j++){
+            col_indices[numelems] = indices[j] + 1;
+            col_elems[numelems++] = -elem[j];
+         }
+
+         change_lbub_from_disj(lb, ub, n, df->disj + i);
+         intercept = 0;
+         
+         for (; j < last; j++){
+            if (elem[j] > epsilon){
+               intercept += elem[j] * lb[indices[j] - m];
+            } 
+            else if (elem[j] < -epsilon){
+               intercept += elem[j] * ub[indices[j] - m];
+            } 
+         }
+         
+         reset_lbub_from_disj(lb, ub, env_warm->mip->lb, env_warm->mip->ub, n, df->disj + i);
+
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 'G', intercept, 0);
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
+         
       } 
-
-      sym_get_obj_val(env_warm, &coldObjVal);
-      printf("OPT OBJ : %.7f\n", coldObjVal);
-
-      printf("RHS: (%.2f, %.2f)\n", rhs[0], rhs[1]);
-      sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-      printf("BEFORE DUAL FUNC: %.5f\n", dualFuncObj);
-
-      // assert(dualFuncObj - coldObjVal < 1e-5 || fabs(dualFuncObj - coldObjVal) < 1e-5);
-      assert(coldObjVal >= dualFuncObj);
-      if (!(fabs(dualFuncObj - coldObjVal) < 1e-5)){
-         sym_build_dual_func(env_warm);
-      }
-
-      sym_evaluate_dual_function(env_warm, rhs, m, &dualFuncObj);
-      printf("AFTER DUAL FUNC: %.5f\n", dualFuncObj);
-      assert(fabs(dualFuncObj - coldObjVal) < 1e-5);
-      // assert(fabs(dualFuncObj - coldObjVal) < 1e-5);
+      if (df->disj[i].ray_idx >= 0){
+         // Add v_t variables
+         snprintf(varname, sizeof(varname), "v%d", i);
+         sym_add_col(env_cold, 0, NULL, NULL, 0, 1, 0, TRUE, varname);
+         v_indices[v_len++] = col_idx++;
    
-   }
-   printf("ENDING\n");
+         // Add first constraint
+         // phi
+         col_indices[numelems] = m + 1;
+         col_elems[numelems++] = 1;
+         // q_t
+         col_indices[numelems] = q_indices[q_len - 1];
+         col_elems[numelems++] = -1;
+         // v_t
+         col_indices[numelems] = v_indices[v_len - 1];
+         col_elems[numelems++] = -bigM;
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 'L', 0, 0);
+         
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
 
+         // Add second constraint
+         // phi
+         col_indices[numelems] = m + 1;
+         col_elems[numelems++] = 1;
+         // q_t
+         col_indices[numelems] = q_indices[q_len - 1];
+         col_elems[numelems++] = -1;
+         // u_t
+         col_indices[numelems] = u_indices[u_len - 1];
+         col_elems[numelems++] = -bigM;
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 'G', -bigM, 0);
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
+
+         // Add u_t + v_t <= 1
+         // u_t
+         col_indices[numelems] = u_indices[u_len - 1];
+         col_elems[numelems++] = 1;
+         // v_t
+         col_indices[numelems] = v_indices[v_len - 1];
+         col_elems[numelems++] = 1;
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 'L', 1, 0);
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
+
+         // Add rays constraints
+         // v_t
+         col_indices[numelems] = v_indices[v_len - 1];
+         col_elems[numelems++] = -bigM;
+
+         first = df->rays->getVectorFirst(df->disj[i].ray_idx);
+		   last = df->rays->getVectorLast(df->disj[i].ray_idx);
+
+         for (j = first; j < last && indices_r[j] < m; j++){
+            col_indices[numelems] = indices_r[j] + 1;
+            col_elems[numelems++] = -elem_r[j];
+         }
+
+         change_lbub_from_disj(lb, ub, n, df->disj + i);
+         intercept = 0;
+         
+         for (; j < last; j++){
+            if (elem_r[j] > epsilon){
+               intercept += elem_r[j] * lb[indices_r[j] - m];
+            } 
+            else if (elem_r[j] < -epsilon){
+               intercept += elem_r[j] * ub[indices_r[j] - m];
+            } 
+         }
+
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 
+                     'L', -intercept, 0);
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 
+                     'G', -bigM +epsilon -intercept, 0);
+
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
+
+         // Add third constraint
+         // q_t
+         col_indices[numelems] = q_indices[q_len - 1];
+         col_elems[numelems++] = 1;
+
+         first = df->duals->getVectorFirst(0);
+		   last = df->duals->getVectorLast(0);
+
+         for (j = first; j < last && indices[j] < m; j++){
+            col_indices[numelems] = indices[j] + 1;
+            col_elems[numelems++] = -elem[j];
+         }
+
+         intercept = 0;
+         
+         for (; j < last; j++){
+            if (elem[j] > epsilon){
+               intercept += elem[j] * lb[indices[j] - m];
+            } 
+            else if (elem[j] < -epsilon){
+               intercept += elem[j] * ub[indices[j] - m];
+            } 
+         }
+         
+         reset_lbub_from_disj(lb, ub, env_warm->mip->lb, env_warm->mip->ub, 
+                              n, df->disj + i);
+
+         sym_add_row(env_cold, numelems, col_indices, col_elems, 
+                     'G', intercept, 0);
+         // clear
+         for (int j = numelems; j >= 0; --j){
+            col_indices[j] = 0;
+            col_elems[j] = 0;
+         }
+         numelems = 0;
+      }
+   }
+
+   // Add fourth constraint
+   for (int i = 0; i < u_len; i++){
+      col_indices[numelems] = u_indices[i];
+      col_elems[numelems++] = 1;
+   }
+   sym_add_row(env_cold, numelems, col_indices, col_elems, 'E', 1, 0);
+   // clear
+   for (int j = numelems; j >= 0; --j){
+      col_indices[j] = 0;
+      col_elems[j] = 0;
+   }
+   numelems = 0;
+
+   // Fix beta variables
+   for (int i = 0; i < m; i++){
+      col_indices[numelems] = i + 1;
+      col_elems[numelems++] = 1;
+      sym_add_row(env_cold, numelems, col_indices, col_elems, 'E', 2000, 0);
+      for (int j = numelems; j >= 0; --j){
+         col_indices[j] = 0;
+         col_elems[j] = 0;
+      }
+      numelems = 0;
+   }
+
+   sym_write_lp(env_cold, "mastertest");
+   sym_solve(env_cold);
+
+   rhs[0] = 3000;
+   rhs[1] = 3000;
+
+   set_rhs(env_warm, rhs, m);
+   sym_solve(env_warm);
+   sym_get_obj_val(env_warm, &warmObjVal);
+   printf("WARM OBJ : %.5f\n", warmObjVal);
+   
    free(rhs);
-   free(rhss);
    sym_close_environment(env_warm);
    sym_close_environment(env_cold);
    return 0;

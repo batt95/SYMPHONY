@@ -922,22 +922,40 @@ typedef struct DUAL_HASH {
    //  int           *basis_idx; // idx of basic vars and slacks
     int           *dual;
     int            len;       // length of basis_idx
+    int            row_idx;   /* this is the idx of the row 
+                                 where this dual is in CoinPackedMatrix duals */
     UT_hash_handle hh;        // hashmap handler
 } dual_hash;
 
 typedef struct RAY_HASH {
     int           *ray; 
-    int            len;       
+    int            len; 
+    int            row_idx;   /* this is the idx of the row 
+                                 where this ray is in CoinPackedMatrix rays */      
     UT_hash_handle hh;        // hashmap handler
 } ray_hash;
 
 typedef struct DISJUNCTION_DESC{
+   /* bc_index of the corresponding node in B&B tree */
+   bc_node        *node;
    int            *lbvaridx;     
    double         *lb;
    int             lblen;
    int            *ubvaridx;
    double         *ub;
    int             ublen;
+/* these are the idx of the rows 
+   where the dual sol for this term
+   and its ancestors
+   are in CoinPackedMatrix duals */
+   int            *dual_idx;  
+   int             duallen;
+/* these are the idx of the rows 
+   where the dual rays for this term
+   and its ancestors
+   are in CoinPackedMatrix rays */
+   int            *ray_idx;  
+   int             raylen;
 } disjunction_desc;
 
 typedef struct DUAL_FUNC_DESC{
