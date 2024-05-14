@@ -4617,6 +4617,8 @@ int build_dual_func(sym_environment *env)
 	printf("Num unique non optimal Dual solutions: %d\n", count_over_ub);
 #endif
 	FREE(bpath);
+	FREE(dual_idx);
+	FREE(ray_idx);
 	FREE(duals_index_row);
 	FREE(duals_index_col);
 	FREE(duals_val);
