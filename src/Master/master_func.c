@@ -36,7 +36,7 @@
 #include "sym_tm.h"
 
 // #define DEBUG_DUAL_FUNC
-// #define CHECK_DUAL_FUNC
+#define CHECK_DUAL_FUNC
 
 /*===========================================================================*/
 /*===========================================================================*/
@@ -3606,6 +3606,7 @@ void free_disjunction(dual_func_desc *dual_func){
 		FREE(dual_func->disj[j].ubvaridx);
 		FREE(dual_func->disj[j].ub);
 		FREE(dual_func->disj[j].dual_idx);
+		FREE(dual_func->disj[j].leaf_idx);
 		FREE(dual_func->disj[j].ray_idx);
 	}
 		
@@ -3861,17 +3862,17 @@ void print_dual_function(warm_start_desc *ws)
 	// printf("==========================\n");
 	// printf("RAYS\n");
 	// printf("==========================\n");
-	// CoinPackedMatrix *rays = ws->dual_func->rays;
-	// elem = rays->getElements();
-    // indices = rays->getIndices();
-	// major = rays->getMajorDim();
-	// minor = rays->getMinorDim();
-	// num_elem = rays->getNumElements();
-	// ord = rays->isColOrdered();
 	// if (ws->dual_func->num_rays == 0){
 	// 	printf("No rays!");
 	// 	printf("\n------------------------\n");
 	// } else {
+	// 	CoinPackedMatrix *rays = ws->dual_func->rays;
+	// 	elem = rays->getElements();
+	// 	indices = rays->getIndices();
+	// 	major = rays->getMajorDim();
+	// 	minor = rays->getMinorDim();
+	// 	num_elem = rays->getNumElements();
+	// 	ord = rays->isColOrdered();
 	// 	for (int i = 0; i < major; i++){
 	// 		const CoinBigIndex last = rays->getVectorLast(i);
 	// 		for (CoinBigIndex j = rays->getVectorFirst(i); j < last; ++j){
@@ -3887,16 +3888,16 @@ void print_dual_function(warm_start_desc *ws)
 	// printf("DUAL SOLUTIONS + REDUCED COSTS \n");
 	// printf("===============================\n");
 
-	// elem = duals->getElements();
-    // indices = duals->getIndices();
-	// major = duals->getMajorDim();
-	// minor = duals->getMinorDim();
-	// num_elem = duals->getNumElements();
-	// ord = duals->isColOrdered();
-	// if (major == 0){
+	// if (ws->dual_func->num_pieces == 0){
 	// 	printf("No Dual Solutions!");
 	// 	printf("\n------------------------\n");
 	// } else {
+	// 	elem = duals->getElements();
+	// 	indices = duals->getIndices();
+	// 	major = duals->getMajorDim();
+	// 	minor = duals->getMinorDim();
+	// 	num_elem = duals->getNumElements();
+	// 	ord = duals->isColOrdered();
 	// 	for (int i = 0; i < major; i++){
 	// 		const CoinBigIndex last = duals->getVectorLast(i);
 	// 		for (CoinBigIndex j = duals->getVectorFirst(i); j < last; ++j){
@@ -3980,6 +3981,7 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 				  branch_desc *bpath, disjunction_desc *new_disj, int* curr_term,
 				  int *prev_term,
 				  int *dual_idx, int duallen, 
+				  int *leaf_idx, int leaflen, 
 				  int *ray_idx, int raylen, 
 				  int* curr_ray, int *rays_index_row, int *rays_index_col, double *rays_val,
 				  int* curr_piece, int *duals_index_row, int *duals_index_col, double *duals_val,
@@ -4050,6 +4052,17 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 				prev_disj.dual_idx, 
 				sizeof(int) * prev_disj.duallen);
 				duallen = prev_disj.duallen;
+			} 
+
+			if (prev_disj.leaflen){
+				// Copy the previous list of duals
+				if (!leaf_idx){
+					leaf_idx = (int*)malloc(sizeof(int) * prev_disj.leaflen);
+				}
+				memcpy(leaf_idx, 
+				prev_disj.leaf_idx, 
+				sizeof(int) * prev_disj.leaflen);
+				leaflen = prev_disj.leaflen;
 			} 
 			
 			if (prev_disj.raylen){
@@ -4141,7 +4154,7 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 					FREE(dual);
 				}
 			}
-			if (!duallen || dual_idx[duallen - 1] != idx_this_dual){
+			if (child_num && (!duallen || dual_idx[duallen - 1] != idx_this_dual)){
 				dual_idx[duallen++] = idx_this_dual;
 			}
 		}
@@ -4322,9 +4335,28 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 			}	
 		}
 		
+		// Duals
 		disj.duallen = duallen;
 		disj.dual_idx = (int*)malloc(sizeof(int) * disj.duallen);
 		memcpy(disj.dual_idx, dual_idx, sizeof(int) * disj.duallen);
+		
+		// Duals at leaves
+		if (idx_this_dual >= 0 && (!leaflen || leaf_idx[leaflen - 1] != idx_this_dual)){
+			disj.leaflen = leaflen + 1;
+			disj.leaf_idx = (int*)malloc(sizeof(int) * disj.leaflen);
+			// Add the new one
+			disj.leaf_idx[leaflen] = idx_this_dual;
+		} else {
+			disj.leaflen = leaflen;
+			disj.leaf_idx = (int*)malloc(sizeof(int) * disj.leaflen);
+		}
+		
+		// Copy the previous
+		if (leaf_idx){
+			memcpy(disj.leaf_idx, leaf_idx, sizeof(int) * leaflen);
+		}
+		
+		// Rays
 		disj.raylen = raylen;
 		disj.ray_idx = NULL;
 		if (disj.raylen){ 
@@ -4364,8 +4396,12 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 		printf(" - %d Fesibility status of this leaf: %d\n", count_leaf, node->feasibility_status);
 		printf("   %d Lower bound at this leaf: %.5f\n", count_leaf, node->lower_bound);
 		printf("   %d Dual Obj Val at this leaf: %.5f\n", count_leaf, dualobj);
+		printf("   %d Dual idx this leaf: %d\n", count_leaf, idx_this_dual);
 		printf("   %d Duals of this leaf: [ ", count_leaf);
 		for (int i = 0; i < disj.duallen; i++) printf("%d, ", disj.dual_idx[i]);
+		printf("]\n");
+		printf("   %d Leaf Duals of this leaf: [ ", count_leaf);
+		for (int i = 0; i < disj.leaflen; i++) printf("%d, ", disj.leaf_idx[i]);
 		printf("]\n");
 		printf("   %d Rays of this leaf: [ ", count_leaf++);
 		for (int i = 0; i < disj.raylen; i++) printf("%d, ", disj.ray_idx[i]);
@@ -4408,7 +4444,7 @@ void collect_duals_from_tree(sym_environment *env, bc_node *node, MIPdesc *mip,
 		for (j = 0; j < child_num; j++)
 			collect_duals_from_tree(env, node->children[j], mip,  
 				  bpath, new_disj, curr_term, prev_term,
-				  dual_idx, duallen, ray_idx, raylen, 
+				  dual_idx, duallen, leaf_idx, leaflen, ray_idx, raylen, 
 				  curr_ray, rays_index_row, rays_index_col, rays_val,
 				  curr_piece, duals_index_row, duals_index_col, duals_val,
 				  nnz_duals, nnz_rays);
@@ -4507,7 +4543,7 @@ int build_dual_func(sym_environment *env)
 
 	collect_duals_from_tree(env, ws->rootnode, mip,  
 				  bpath, disj, &curr_term, &prev_term,
-				  dual_idx, 0, ray_idx, 0, 
+				  dual_idx, 0, NULL, 0, ray_idx, 0, 
 				  &curr_ray, rays_index_row, rays_index_col, rays_val,
 				  &curr_piece, duals_index_row, duals_index_col, duals_val,
 				  &nnz_duals, &nnz_rays);

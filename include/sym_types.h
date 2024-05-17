@@ -945,11 +945,16 @@ typedef struct DISJUNCTION_DESC{
    double         *ub;
    int             ublen;
 /* these are the idx of the rows 
-   where the dual sol for this term
+   where the dual sols for this term
    and its ancestors
    are in CoinPackedMatrix duals */
    int            *dual_idx;  
    int             duallen;
+/* these are the idx of the rows 
+   where the dual sols that ever been
+   leaves are in CoinPackedMatrix duals */
+   int            *leaf_idx;
+   int             leaflen;
 /* these are the idx of the rows 
    where the dual rays for this term
    and its ancestors
